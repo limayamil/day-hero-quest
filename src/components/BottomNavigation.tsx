@@ -38,7 +38,7 @@ export const BottomNavigation = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border">
-      <div className="flex items-center justify-around h-16 max-w-md mx-auto px-4">
+      <div className="flex items-center h-16 max-w-md mx-auto px-2">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -48,14 +48,14 @@ export const BottomNavigation = () => {
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 min-w-0",
+                "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 min-w-0 flex-1",
                 isActive
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
-              <div className="relative">
-                <Icon className="w-5 h-5" />
+              <div className="relative flex items-center justify-center w-6 h-6">
+                <Icon className="w-5 h-5 flex-shrink-0" />
 
                 {/* Badge para notificaciones (futuro) */}
                 {item.badge && item.badge > 0 && (
@@ -66,7 +66,7 @@ export const BottomNavigation = () => {
               </div>
 
               <span className={cn(
-                "text-xs font-medium truncate max-w-full",
+                "text-xs font-medium truncate max-w-full text-center leading-tight",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}>
                 {item.label}
