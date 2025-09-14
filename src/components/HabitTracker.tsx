@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, getDateString } from '@/types/activity';
+import { Activity, CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, getDateString } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useHabitStats } from '@/hooks/useHabitStats';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ interface HabitTrackerProps {
 }
 
 export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) => {
+  const [activities] = useLocalStorage<Activity[]>('daily-activities', []);
   const [dailyHabits, setDailyHabits] = useLocalStorage<DailyHabit[]>('daily-habits', []);
   const habitStats = useHabitStats();
   const { toast } = useToast();
@@ -22,25 +23,79 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
   const dateString = getDateString(selectedDate);
   const isToday = dateString === getDateString(new Date());
 
-  // Obtener o crear el hábito del día
+  // Obtener actividades completadas del día
+  const dayActivities = useMemo(() => {
+    return activities.filter(activity => {
+      const activityDate = activity.status === 'completed'
+        ? getDateString(new Date(activity.timestamp))
+        : getDateString(new Date(activity.plannedDate || activity.timestamp));
+      return activityDate === dateString && activity.status === 'completed';
+    });
+  }, [activities, dateString]);
+
+  // Obtener categorías que tienen al menos una actividad completada
+  const categoriesWithActivities = useMemo(() => {
+    const categoriesSet = new Set<CategoryType>();
+    dayActivities.forEach(activity => {
+      categoriesSet.add(activity.category);
+    });
+    return categoriesSet;
+  }, [dayActivities]);
+
+  // Obtener o crear el hábito del día con auto-completado basado en actividades
   const todayHabit = useMemo(() => {
     const existing = dailyHabits.find(h => h.date === dateString);
-    if (existing) return existing;
 
-    // Crear nuevo hábito para el día
+    // Crear progreso inicial considerando las actividades completadas
     const initialProgress = Object.keys(CATEGORIES).reduce((acc, category) => {
-      acc[category as CategoryType] = false;
+      const categoryKey = category as CategoryType;
+      // Marcar como completado si existe una actividad de esa categoría o si ya estaba marcado manualmente
+      acc[categoryKey] = categoriesWithActivities.has(categoryKey) || (existing?.categoryProgress[categoryKey] || false);
       return acc;
     }, {} as Record<CategoryType, boolean>);
 
-    return {
+    const completedCount = Object.values(initialProgress).filter(Boolean).length;
+    const totalHabitPoints = Object.entries(initialProgress).reduce((sum, [category, completed]) => {
+      return sum + (completed ? CATEGORIES[category as CategoryType].points : 0);
+    }, 0);
+
+    // Verificar si se merece el bonus
+    const bonusEarned = completedCount === TOTAL_CATEGORIES;
+    const totalPoints = totalHabitPoints + (bonusEarned ? BONUS_POINTS.DAILY_COMPLETE : 0);
+
+    const habit: DailyHabit = {
       date: dateString,
       categoryProgress: initialProgress,
-      bonusEarned: false,
-      totalPoints: 0,
-      completedCategories: 0,
-    } as DailyHabit;
-  }, [dailyHabits, dateString]);
+      bonusEarned,
+      totalPoints,
+      completedCategories: completedCount,
+    };
+
+    return habit;
+  }, [dailyHabits, dateString, categoriesWithActivities]);
+
+  // Efecto para sincronizar automáticamente los hábitos con las actividades
+  useEffect(() => {
+    const existingHabit = dailyHabits.find(h => h.date === dateString);
+
+    // Solo actualizar si hay cambios reales en el progreso
+    if (!existingHabit ||
+        JSON.stringify(existingHabit.categoryProgress) !== JSON.stringify(todayHabit.categoryProgress) ||
+        existingHabit.bonusEarned !== todayHabit.bonusEarned ||
+        existingHabit.totalPoints !== todayHabit.totalPoints) {
+
+      setDailyHabits(prev => {
+        const index = prev.findIndex(h => h.date === dateString);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = todayHabit;
+          return updated;
+        } else {
+          return [...prev, todayHabit];
+        }
+      });
+    }
+  }, [todayHabit, dailyHabits, dateString, setDailyHabits]);
 
   // Calcular progreso
   const progress = useMemo(() => {
@@ -59,6 +114,16 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
   // Manejar toggle de categoría
   const toggleCategory = (category: CategoryType) => {
     if (!isToday) return; // Solo permitir edición para el día actual
+
+    // Si la categoría está auto-completada por una actividad, no se puede desmarcar
+    if (categoriesWithActivities.has(category) && todayHabit.categoryProgress[category]) {
+      toast({
+        title: "No se puede desmarcar",
+        description: `Ya tienes actividades registradas en ${CATEGORIES[category].label}`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     const newProgress = { ...todayHabit.categoryProgress };
     const wasCompleted = newProgress[category];
@@ -161,6 +226,8 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       <CardContent className="space-y-3">
         {(Object.entries(CATEGORIES) as Array<[CategoryType, typeof CATEGORIES[CategoryType]]>).map(([category, config]) => {
           const isCompleted = todayHabit.categoryProgress[category];
+          const isAutoCompleted = categoriesWithActivities.has(category);
+          const canToggle = isToday && (!isAutoCompleted || !isCompleted);
 
           return (
             <div
@@ -168,7 +235,9 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
               className={cn(
                 "flex items-center justify-between p-4 rounded-lg border-2 transition-all duration-200",
                 isCompleted
-                  ? "border-primary bg-primary/5"
+                  ? isAutoCompleted
+                    ? "border-green-500/50 bg-green-500/10 dark:border-green-400/50 dark:bg-green-400/10"
+                    : "border-primary bg-primary/5"
                   : "border-border hover:border-muted-foreground/30",
                 !isToday && "opacity-70"
               )}
@@ -177,13 +246,21 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="p-0 h-8 w-8"
+                  className={cn(
+                    "p-0 h-8 w-8",
+                    !canToggle && "cursor-not-allowed opacity-60"
+                  )}
                   onClick={() => toggleCategory(category)}
-                  disabled={!isToday}
+                  disabled={!canToggle}
                 >
                   {isCompleted ? (
                     <CheckCircle2
-                      className="w-6 h-6 text-primary"
+                      className={cn(
+                        "w-6 h-6",
+                        isAutoCompleted
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-primary"
+                      )}
                     />
                   ) : (
                     <Circle className="w-6 h-6 text-muted-foreground" />
@@ -199,6 +276,11 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {config.points} puntos
+                    {isAutoCompleted && isCompleted && (
+                      <span className="ml-1 text-green-600 dark:text-green-400">
+                        • Auto
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -206,9 +288,13 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
               {isCompleted && (
                 <Badge
                   variant="secondary"
-                  className="bg-primary/10 text-primary"
+                  className={cn(
+                    isAutoCompleted
+                      ? "bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400"
+                      : "bg-primary/10 text-primary"
+                  )}
                 >
-                  ✓ Completo
+                  {isAutoCompleted ? "📊 Actividad" : "✓ Manual"}
                 </Badge>
               )}
             </div>

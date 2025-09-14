@@ -87,7 +87,8 @@ const Habits = () => {
             <CardContent className="text-sm text-muted-foreground space-y-2">
               <p>• Completa una actividad de cada categoría todos los días</p>
               <p>• Al completar las 6 categorías ganas <strong>50 puntos bonus</strong></p>
-              <p>• Los hábitos se suman a tus actividades regulares</p>
+              <p>• Los hábitos se <strong>auto-completan</strong> cuando registras actividades</p>
+              <p>• También puedes marcarlos manualmente si no registraste una actividad</p>
               <p>• Revisa días anteriores para ver tu progreso</p>
             </CardContent>
           </Card>
