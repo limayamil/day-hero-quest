@@ -47,6 +47,30 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        category: {
+          personal: "hsl(var(--category-personal))",
+          "personal-foreground": "hsl(var(--category-personal-foreground))",
+          laburo: "hsl(var(--category-laburo))",
+          "laburo-foreground": "hsl(var(--category-laburo-foreground))",
+          freelance: "hsl(var(--category-freelance))",
+          "freelance-foreground": "hsl(var(--category-freelance-foreground))",
+          social: "hsl(var(--category-social))",
+          "social-foreground": "hsl(var(--category-social-foreground))",
+          otros: "hsl(var(--category-otros))",
+          "otros-foreground": "hsl(var(--category-otros-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -80,10 +104,42 @@ export default {
             height: "0",
           },
         },
+        "fade-in-up": {
+          from: {
+            opacity: "0",
+            transform: "translateY(20px)",
+          },
+          to: {
+            opacity: "1",
+            transform: "translateY(0)",
+          },
+        },
+        "pulse-success": {
+          "0%, 100%": {
+            boxShadow: "0 0 0 0 hsl(var(--success) / 0.4)",
+          },
+          "50%": {
+            boxShadow: "0 0 0 10px hsl(var(--success) / 0)",
+          },
+        },
+        "bounce-gentle": {
+          "0%, 20%, 50%, 80%, 100%": {
+            transform: "translateY(0)",
+          },
+          "40%": {
+            transform: "translateY(-4px)",
+          },
+          "60%": {
+            transform: "translateY(-2px)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in-up": "fade-in-up 0.6s ease-out",
+        "pulse-success": "pulse-success 2s infinite",
+        "bounce-gentle": "bounce-gentle 2s infinite",
       },
     },
   },
