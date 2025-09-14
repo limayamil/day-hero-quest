@@ -1,0 +1,51 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="star" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bg)" stroke="#065f46" stroke-width="8"/>
+
+  <!-- Trophy/Achievement icon -->
+  <g transform="translate(256, 200)">
+    <!-- Trophy base -->
+    <rect x="-30" y="40" width="60" height="20" rx="4" fill="#fbbf24"/>
+    <rect x="-20" y="50" width="40" height="15" rx="2" fill="#f59e0b"/>
+
+    <!-- Trophy cup -->
+    <path d="M-40 -20 Q-40 -40 -20 -40 L20 -40 Q40 -40 40 -20 L40 20 Q40 40 20 40 L-20 40 Q-40 40 -40 20 Z" fill="#fbbf24"/>
+    <path d="M-35 -15 Q-35 -35 -15 -35 L15 -35 Q35 -35 35 -15 L35 15 Q35 35 15 35 L-15 35 Q-35 35 -35 15 Z" fill="#fef3c7"/>
+
+    <!-- Trophy handles -->
+    <ellipse cx="-45" cy="0" rx="8" ry="15" fill="#f59e0b"/>
+    <ellipse cx="45" cy="0" rx="8" ry="15" fill="#f59e0b"/>
+  </g>
+
+  <!-- Sparkle/Star effects -->
+  <g fill="url(#star)">
+    <!-- Large star top-left -->
+    <path d="M150 120 L158 136 L174 136 L161 147 L166 163 L150 152 L134 163 L139 147 L126 136 L142 136 Z"/>
+
+    <!-- Medium star top-right -->
+    <path d="M360 140 L366 152 L378 152 L368 160 L371 172 L360 166 L349 172 L352 160 L342 152 L354 152 Z"/>
+
+    <!-- Small star bottom-left -->
+    <circle cx="140" cy="350" r="8" fill="#fbbf24"/>
+    <path d="M140 342 L142 346 L146 346 L143 349 L144 353 L140 351 L136 353 L137 349 L134 346 L138 346 Z" fill="#ffffff"/>
+
+    <!-- Small star bottom-right -->
+    <circle cx="380" cy="320" r="6" fill="#fbbf24"/>
+    <path d="M380 315 L381 318 L384 318 L382 320 L383 323 L380 322 L377 323 L378 320 L376 318 L379 318 Z" fill="#ffffff"/>
+  </g>
+
+  <!-- Check mark in trophy -->
+  <path d="M230 190 L245 205 L285 165" stroke="#16a34a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

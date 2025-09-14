@@ -17,25 +17,49 @@ const Index = () => {
 
   const addActivity = (text: string, category: CategoryType, plannedDate?: Date) => {
     const now = new Date();
-    const isToday = plannedDate ? 
-      plannedDate.toDateString() === now.toDateString() : true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let status: 'completed' | 'planned' = 'completed';
+    let timestamp = now;
+    let actualPlannedDate = plannedDate || now;
+
+    if (plannedDate) {
+      const selectedDate = new Date(plannedDate);
+      selectedDate.setHours(0, 0, 0, 0);
+
+      if (selectedDate > today) {
+        // Fecha futura - actividad planificada
+        status = 'planned';
+      } else if (selectedDate < today) {
+        // Fecha pasada - actividad completada en el pasado
+        status = 'completed';
+        timestamp = plannedDate; // Usar la fecha pasada como timestamp
+      } else {
+        // Fecha de hoy - actividad completada hoy
+        status = 'completed';
+      }
+    }
 
     const newActivity: Activity = {
       id: Date.now().toString(),
       text,
       category,
-      timestamp: now,
+      timestamp,
       points: CATEGORIES[category].points,
-      status: isToday ? 'completed' : 'planned',
-      plannedDate: plannedDate || now,
+      status,
+      plannedDate: actualPlannedDate,
     };
 
     setActivities((prev) => [newActivity, ...prev]);
-    
-    if (isToday) {
+
+    if (status === 'completed') {
+      const isFromPast = plannedDate && plannedDate < today;
       toast({
-        title: "¡Actividad completada! ✨",
-        description: `+${newActivity.points} puntos por ${CATEGORIES[category].label}`,
+        title: isFromPast ? "¡Actividad del pasado registrada! 📝" : "¡Actividad completada! ✨",
+        description: isFromPast
+          ? `+${newActivity.points} puntos por ${CATEGORIES[category].label} del ${plannedDate?.toLocaleDateString('es-ES')}`
+          : `+${newActivity.points} puntos por ${CATEGORIES[category].label}`,
       });
     } else {
       toast({

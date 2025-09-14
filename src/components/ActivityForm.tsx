@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CategoryType, CATEGORIES } from '@/types/activity';
-import { Plus, Sparkles, CalendarDays, Clock } from 'lucide-react';
+import { Plus, Sparkles, CalendarDays, Clock, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale/es';
@@ -22,11 +22,13 @@ interface ActivityFormProps {
   onAddActivity: (text: string, category: CategoryType, plannedDate?: Date) => void;
 }
 
+type DateMode = 'today' | 'future' | 'past';
+
 export function ActivityForm({ onAddActivity }: ActivityFormProps) {
   const [text, setText] = useState('');
   const [category, setCategory] = useState<CategoryType>('personal');
   const [plannedDate, setPlannedDate] = useState<Date>();
-  const [isPlanning, setIsPlanning] = useState(false);
+  const [dateMode, setDateMode] = useState<DateMode>('today');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,14 +36,44 @@ export function ActivityForm({ onAddActivity }: ActivityFormProps) {
       onAddActivity(text.trim(), category, plannedDate);
       setText('');
       setPlannedDate(undefined);
-      setIsPlanning(false);
+      setDateMode('today');
     }
   };
 
   const selectedCategory = CATEGORIES[category];
   const today = new Date();
-  const isToday = plannedDate ? 
-    plannedDate.toDateString() === today.toDateString() : true;
+
+  const getPromptText = () => {
+    switch (dateMode) {
+      case 'today':
+        return '¿Qué hiciste hoy?';
+      case 'future':
+        return '¿Qué planeas hacer?';
+      case 'past':
+        return '¿Qué hiciste en el pasado?';
+    }
+  };
+
+  const getPlaceholder = () => {
+    switch (dateMode) {
+      case 'today':
+        return 'Describe tu actividad de hoy...';
+      case 'future':
+        return 'Planifica tu actividad...';
+      case 'past':
+        return 'Describe lo que hiciste...';
+    }
+  };
+
+  const getButtonText = () => {
+    if (dateMode === 'today') {
+      return `Agregar Actividad (+${selectedCategory.points} pts)`;
+    } else if (dateMode === 'future') {
+      return 'Planificar Actividad';
+    } else {
+      return `Registrar Actividad Pasada (+${selectedCategory.points} pts)`;
+    }
+  };
 
   return (
     <Card className="p-6 shadow-medium gradient-card">
@@ -49,13 +81,13 @@ export function ActivityForm({ onAddActivity }: ActivityFormProps) {
         <div className="space-y-2">
           <Label htmlFor="activity" className="text-sm font-medium flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-success" />
-            {isPlanning ? '¿Qué planeas hacer?' : '¿Qué hiciste hoy?'}
+            {getPromptText()}
           </Label>
           <Input
             id="activity"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={isPlanning ? "Planifica tu actividad..." : "Describe tu actividad..."}
+            placeholder={getPlaceholder()}
             className="w-full"
           />
         </div>
@@ -88,30 +120,41 @@ export function ActivityForm({ onAddActivity }: ActivityFormProps) {
           </Select>
         </div>
 
-        <div className="flex gap-2">
-          <Button 
+        <div className="grid grid-cols-3 gap-2">
+          <Button
             type="button"
-            variant={!isPlanning ? "default" : "outline"}
-            onClick={() => {setIsPlanning(false); setPlannedDate(undefined);}}
+            variant={dateMode === 'today' ? "default" : "outline"}
+            onClick={() => {setDateMode('today'); setPlannedDate(undefined);}}
             className="flex-1"
           >
             <Clock className="h-4 w-4 mr-2" />
-            Ahora
+            Hoy
           </Button>
-          <Button 
+          <Button
             type="button"
-            variant={isPlanning ? "default" : "outline"}
-            onClick={() => setIsPlanning(true)}
+            variant={dateMode === 'future' ? "default" : "outline"}
+            onClick={() => setDateMode('future')}
             className="flex-1"
           >
             <CalendarDays className="h-4 w-4 mr-2" />
             Planificar
           </Button>
+          <Button
+            type="button"
+            variant={dateMode === 'past' ? "default" : "outline"}
+            onClick={() => setDateMode('past')}
+            className="flex-1"
+          >
+            <History className="h-4 w-4 mr-2" />
+            Pasado
+          </Button>
         </div>
 
-        {isPlanning && (
+        {(dateMode === 'future' || dateMode === 'past') && (
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Fecha planificada</Label>
+            <Label className="text-sm font-medium">
+              {dateMode === 'future' ? 'Fecha planificada' : 'Fecha de la actividad'}
+            </Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -130,7 +173,7 @@ export function ActivityForm({ onAddActivity }: ActivityFormProps) {
                   mode="single"
                   selected={plannedDate}
                   onSelect={setPlannedDate}
-                  disabled={(date) => date < today}
+                  disabled={(date) => dateMode === 'future' ? date < today : date >= today}
                   initialFocus
                   locale={es}
                 />
@@ -139,16 +182,16 @@ export function ActivityForm({ onAddActivity }: ActivityFormProps) {
           </div>
         )}
 
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           className={cn(
             'w-full font-medium gradient-primary hover:opacity-90 transition-all',
-            !isToday && 'gradient-motivational'
+            dateMode === 'future' && 'gradient-motivational'
           )}
-          disabled={!text.trim() || (isPlanning && !plannedDate)}
+          disabled={!text.trim() || ((dateMode === 'future' || dateMode === 'past') && !plannedDate)}
         >
           <Plus className="h-4 w-4 mr-2" />
-          {isToday ? `Agregar Actividad (+${selectedCategory.points} pts)` : 'Planificar Actividad'}
+          {getButtonText()}
         </Button>
       </form>
     </Card>
