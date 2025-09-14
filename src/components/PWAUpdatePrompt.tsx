@@ -40,7 +40,7 @@ export function PWAUpdatePrompt() {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 flex justify-center">
+    <div className="fixed bottom-20 left-4 right-4 z-[60] flex justify-center">
       <Card className="p-4 shadow-lg border-success bg-card/95 backdrop-blur-sm max-w-sm w-full">
         <div className="space-y-3">
           {needRefresh ? (
