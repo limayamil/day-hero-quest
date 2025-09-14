@@ -68,6 +68,8 @@ export default {
           "freelance-foreground": "hsl(var(--category-freelance-foreground))",
           social: "hsl(var(--category-social))",
           "social-foreground": "hsl(var(--category-social-foreground))",
+          salud: "hsl(var(--category-salud))",
+          "salud-foreground": "hsl(var(--category-salud-foreground))",
           otros: "hsl(var(--category-otros))",
           "otros-foreground": "hsl(var(--category-otros-foreground))",
         },

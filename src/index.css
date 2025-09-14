@@ -58,7 +58,10 @@ All colors MUST be HSL.
     
     --category-social: 38 92% 50%;
     --category-social-foreground: 48 96% 12%;
-    
+
+    --category-salud: 120 60% 50%;
+    --category-salud-foreground: 355 100% 97%;
+
     --category-otros: 340 82% 52%;
     --category-otros-foreground: 355 100% 97%;
 
@@ -142,7 +145,10 @@ All colors MUST be HSL.
     
     --category-social: 38 92% 60%;
     --category-social-foreground: 220 26% 8%;
-    
+
+    --category-salud: 120 60% 60%;
+    --category-salud-foreground: 220 26% 8%;
+
     --category-otros: 340 82% 62%;
     --category-otros-foreground: 220 26% 8%;
 

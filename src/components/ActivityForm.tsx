@@ -20,23 +20,31 @@ import { es } from 'date-fns/locale/es';
 
 interface ActivityFormProps {
   onAddActivity: (text: string, category: CategoryType, plannedDate?: Date) => void;
+  defaultDate?: Date;
+  compact?: boolean;
 }
 
 type DateMode = 'today' | 'future' | 'past';
 
-export function ActivityForm({ onAddActivity }: ActivityFormProps) {
+export function ActivityForm({ onAddActivity, defaultDate, compact = false }: ActivityFormProps) {
   const [text, setText] = useState('');
   const [category, setCategory] = useState<CategoryType>('personal');
-  const [plannedDate, setPlannedDate] = useState<Date>();
-  const [dateMode, setDateMode] = useState<DateMode>('today');
+  const [plannedDate, setPlannedDate] = useState<Date>(defaultDate);
+  const [dateMode, setDateMode] = useState<DateMode>(
+    defaultDate && defaultDate.toDateString() !== new Date().toDateString()
+      ? (defaultDate > new Date() ? 'future' : 'past')
+      : 'today'
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim()) {
-      onAddActivity(text.trim(), category, plannedDate);
+      onAddActivity(text.trim(), category, plannedDate || defaultDate);
       setText('');
-      setPlannedDate(undefined);
-      setDateMode('today');
+      if (!defaultDate) {
+        setPlannedDate(undefined);
+        setDateMode('today');
+      }
     }
   };
 

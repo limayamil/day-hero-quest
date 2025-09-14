@@ -22,7 +22,7 @@ const Index = () => {
 
     let status: 'completed' | 'planned' = 'completed';
     let timestamp = now;
-    let actualPlannedDate = plannedDate || now;
+    const actualPlannedDate = plannedDate || now;
 
     if (plannedDate) {
       const selectedDate = new Date(plannedDate);
@@ -137,7 +137,7 @@ const Index = () => {
   }, [todayActivities]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <div className="container max-w-md mx-auto p-4 space-y-6">
         {/* Header con stats y theme toggle */}
         <div className="pt-4">
