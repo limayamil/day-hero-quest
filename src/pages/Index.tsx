@@ -3,8 +3,10 @@ import { Activity, CategoryType, DailyStats, CATEGORIES } from '@/types/activity
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ActivityForm } from '@/components/ActivityForm';
 import { ActivityCard } from '@/components/ActivityCard';
+import { PlannedActivityCard } from '@/components/PlannedActivityCard';
 import { StatsCard } from '@/components/StatsCard';
 import { MotivationalMessage } from '@/components/MotivationalMessage';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -13,28 +15,86 @@ const Index = () => {
   const [activities, setActivities] = useLocalStorage<Activity[]>('daily-activities', []);
   const { toast } = useToast();
 
-  const addActivity = (text: string, category: CategoryType) => {
+  const addActivity = (text: string, category: CategoryType, plannedDate?: Date) => {
+    const now = new Date();
+    const isToday = plannedDate ? 
+      plannedDate.toDateString() === now.toDateString() : true;
+
     const newActivity: Activity = {
       id: Date.now().toString(),
       text,
       category,
-      timestamp: new Date(),
+      timestamp: now,
       points: CATEGORIES[category].points,
+      status: isToday ? 'completed' : 'planned',
+      plannedDate: plannedDate || now,
     };
 
     setActivities((prev) => [newActivity, ...prev]);
     
+    if (isToday) {
+      toast({
+        title: "¡Actividad completada! ✨",
+        description: `+${newActivity.points} puntos por ${CATEGORIES[category].label}`,
+      });
+    } else {
+      toast({
+        title: "¡Actividad planificada! 📅",
+        description: `${CATEGORIES[category].label} programada para ${plannedDate?.toLocaleDateString('es-ES')}`,
+      });
+    }
+  };
+
+  const completeActivity = (id: string) => {
+    setActivities((prev) =>
+      prev.map((activity) =>
+        activity.id === id
+          ? { ...activity, status: 'completed' as const, timestamp: new Date() }
+          : activity
+      )
+    );
+    
+    const activity = activities.find(a => a.id === id);
+    if (activity) {
+      toast({
+        title: "¡Actividad completada! ✨",
+        description: `+${activity.points} puntos por ${CATEGORIES[activity.category].label}`,
+      });
+    }
+  };
+
+  const cancelActivity = (id: string) => {
+    setActivities((prev) =>
+      prev.map((activity) =>
+        activity.id === id
+          ? { ...activity, status: 'cancelled' as const }
+          : activity
+      )
+    );
+    
     toast({
-      title: "¡Actividad agregada! ✨",
-      description: `+${newActivity.points} puntos por ${CATEGORIES[category].label}`,
+      title: "Actividad cancelada",
+      description: "No te preocupes, siempre puedes intentarlo otro día",
     });
   };
 
   // Obtener actividades del día actual
   const todayActivities = useMemo(() => {
     const today = new Date().toDateString();
+    return activities.filter(activity => {
+      const activityDate = activity.status === 'completed' 
+        ? new Date(activity.timestamp).toDateString()
+        : new Date(activity.plannedDate || activity.timestamp).toDateString();
+      return activityDate === today && activity.status === 'completed';
+    });
+  }, [activities]);
+
+  // Obtener actividades planeadas para hoy
+  const todayPlannedActivities = useMemo(() => {
+    const today = new Date().toDateString();
     return activities.filter(activity => 
-      new Date(activity.timestamp).toDateString() === today
+      activity.status === 'planned' && 
+      new Date(activity.plannedDate || activity.timestamp).toDateString() === today
     );
   }, [activities]);
 
@@ -55,27 +115,55 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-md mx-auto p-4 space-y-6">
-        {/* Header con stats */}
+        {/* Header con stats y theme toggle */}
         <div className="pt-4">
-          <h1 className="text-2xl font-bold text-center mb-6 text-foreground">
-            Mi Día Productivo
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold text-foreground">
+              Mi Día Productivo
+            </h1>
+            <ThemeToggle />
+          </div>
           <StatsCard stats={todayStats} />
         </div>
 
         {/* Mensaje motivacional */}
-        <MotivationalMessage />
+        <MotivationalMessage totalPoints={todayStats.totalPoints} />
 
         {/* Formulario para agregar actividades */}
         <ActivityForm onAddActivity={addActivity} />
 
-        {/* Lista de actividades del día */}
+        {/* Actividades planeadas para hoy */}
+        {todayPlannedActivities.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-foreground">
+                Actividades planeadas
+              </h2>
+              <span className="text-sm text-muted-foreground">
+                ({todayPlannedActivities.length})
+              </span>
+            </div>
+            <div className="space-y-3">
+              {todayPlannedActivities.map((activity) => (
+                <PlannedActivityCard 
+                  key={activity.id} 
+                  activity={activity}
+                  onComplete={completeActivity}
+                  onCancel={cancelActivity}
+                />
+              ))}
+            </div>
+            <Separator />
+          </div>
+        )}
+
+        {/* Lista de actividades completadas del día */}
         <div className="space-y-4">
           {todayActivities.length > 0 && (
             <>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-foreground">
-                  Actividades de hoy
+                  Actividades completadas
                 </h2>
                 <span className="text-sm text-muted-foreground">
                   ({todayActivities.length})
@@ -87,7 +175,7 @@ const Index = () => {
           
           <ScrollArea className="h-[400px] w-full">
             <div className="space-y-3 pr-4">
-              {todayActivities.length === 0 ? (
+              {todayActivities.length === 0 && todayPlannedActivities.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <p className="text-lg mb-2">¡Empieza tu día! 🌟</p>
                   <p className="text-sm">

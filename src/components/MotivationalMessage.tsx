@@ -1,26 +1,35 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { MOTIVATIONAL_PHRASES } from '@/types/activity';
+import { getContextualMessage, ACHIEVEMENT_MESSAGES } from '@/types/activity';
 import { Heart, Sparkles } from 'lucide-react';
 
-export function MotivationalMessage() {
+interface MotivationalMessageProps {
+  totalPoints?: number;
+}
+
+export function MotivationalMessage({ totalPoints = 0 }: MotivationalMessageProps) {
   const [currentPhrase, setCurrentPhrase] = useState('');
 
   useEffect(() => {
-    const getRandomPhrase = () => {
-      const randomIndex = Math.floor(Math.random() * MOTIVATIONAL_PHRASES.length);
-      return MOTIVATIONAL_PHRASES[randomIndex];
+    const getPhrase = () => {
+      // Si hay puntos, mostrar mensajes de logro ocasionalmente
+      if (totalPoints > 0 && Math.random() > 0.7) {
+        const randomIndex = Math.floor(Math.random() * ACHIEVEMENT_MESSAGES.length);
+        return ACHIEVEMENT_MESSAGES[randomIndex];
+      }
+      // Sino, mensaje contextual del día
+      return getContextualMessage();
     };
 
-    setCurrentPhrase(getRandomPhrase());
+    setCurrentPhrase(getPhrase());
 
-    // Cambiar frase cada 10 segundos
+    // Cambiar frase cada 15 segundos
     const interval = setInterval(() => {
-      setCurrentPhrase(getRandomPhrase());
-    }, 10000);
+      setCurrentPhrase(getPhrase());
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [totalPoints]);
 
   return (
     <Card className="p-4 bg-gradient-to-r from-success/10 to-info/10 border-success/20 animate-fade-in-up">

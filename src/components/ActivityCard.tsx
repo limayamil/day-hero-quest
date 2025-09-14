@@ -1,7 +1,7 @@
 import { Activity, CATEGORIES } from '@/types/activity';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Star } from 'lucide-react';
+import { Clock, Star, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityCardProps {
@@ -15,6 +15,8 @@ export function ActivityCard({ activity, className }: ActivityCardProps) {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  const isCompleted = activity.status === 'completed';
 
   return (
     <Card className={cn(
@@ -31,6 +33,7 @@ export function ActivityCard({ activity, className }: ActivityCardProps) {
             {activity.text}
           </p>
           <div className="flex items-center gap-2 mt-2">
+            {isCompleted && <CheckCircle className="h-3 w-3 text-success" />}
             <Clock className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">{timeStr}</span>
           </div>
