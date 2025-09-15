@@ -122,8 +122,6 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
 
   // Manejar toggle de categoría
   const toggleCategory = (category: CategoryType) => {
-    if (!isToday) return; // Solo permitir edición para el día actual
-
     // Si la categoría está auto-completada por una actividad, no se puede desmarcar
     if (categoriesWithActivities.has(category) && todayHabit.categoryProgress[category]) {
       toast({
@@ -239,7 +237,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
         {(Object.entries(CATEGORIES) as Array<[CategoryType, typeof CATEGORIES[CategoryType]]>).map(([category, config]) => {
           const isCompleted = todayHabit.categoryProgress[category];
           const isAutoCompleted = categoriesWithActivities.has(category);
-          const canToggle = isToday && (!isAutoCompleted || !isCompleted);
+          const canToggle = !isAutoCompleted || !isCompleted;
           const requiredCategories = getRequiredCategoriesForDate(selectedDate);
           const isRequired = requiredCategories.includes(category);
           const isWeekendDay = isWeekend(selectedDate);
@@ -258,7 +256,6 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   : isRequired
                   ? "border-border hover:border-muted-foreground/30"
                   : "border-border/50 bg-muted/20",
-                !isToday && "opacity-70",
                 !isRequired && "opacity-60"
               )}
             >
