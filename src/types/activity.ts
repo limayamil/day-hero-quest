@@ -147,3 +147,26 @@ export const getWeekStart = (date: Date): Date => {
 export const getMonthString = (date: Date = new Date()): string => {
   return date.toISOString().slice(0, 7); // YYYY-MM
 };
+
+// Weekend detection utilities
+export const isWeekend = (date: Date): boolean => {
+  const day = date.getDay();
+  return day === 0 || day === 6; // Sunday (0) or Saturday (6)
+};
+
+// Get required categories for a specific date (accounting for weekend wildcards)
+export const getRequiredCategoriesForDate = (date: Date): CategoryType[] => {
+  const allCategories = Object.keys(CATEGORIES) as CategoryType[];
+
+  if (isWeekend(date)) {
+    // On weekends, exclude 'laburo' and 'otros' from required categories
+    return allCategories.filter(cat => cat !== 'laburo' && cat !== 'otros');
+  }
+
+  return allCategories; // All categories required on weekdays
+};
+
+// Get total required categories count for a date
+export const getRequiredCategoryCount = (date: Date): number => {
+  return getRequiredCategoriesForDate(date).length;
+};

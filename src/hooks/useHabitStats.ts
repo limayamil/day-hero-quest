@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLocalStorage } from './useLocalStorage';
-import { DailyHabit, BONUS_POINTS, getDateString } from '@/types/activity';
+import { DailyHabit, BONUS_POINTS, getDateString, getRequiredCategoryCount } from '@/types/activity';
 
 interface HabitStats {
   currentStreak: number;
@@ -30,9 +30,10 @@ export const useHabitStats = (): HabitStats => {
     const todayString = getDateString(today);
     let checkDate = new Date(today);
 
-    // Verificar si hoy cuenta para la racha
+    // Verificar si hoy cuenta para la racha (completó las categorías requeridas para hoy)
     const todayHabit = dailyHabits.find(h => h.date === todayString);
-    if (todayHabit && todayHabit.completedCategories > 0) {
+    const todayRequiredCount = getRequiredCategoryCount(today);
+    if (todayHabit && todayHabit.completedCategories >= todayRequiredCount) {
       currentStreak = 1;
       const newCheckDate = new Date(checkDate);
       newCheckDate.setDate(newCheckDate.getDate() - 1);
@@ -42,9 +43,10 @@ export const useHabitStats = (): HabitStats => {
     // Contar días consecutivos hacia atrás
     for (let i = 0; i < 100; i++) { // Máximo 100 días hacia atrás
       const dateString = getDateString(checkDate);
-      const habit = dailyHabits.find(h => h.date === dateString && h.completedCategories > 0);
+      const habit = dailyHabits.find(h => h.date === dateString);
+      const dayRequiredCount = getRequiredCategoryCount(checkDate);
 
-      if (habit) {
+      if (habit && habit.completedCategories >= dayRequiredCount) {
         if (currentStreak > 0 || i === 0) currentStreak++;
       } else if (i > 0 || currentStreak === 0) {
         break;
@@ -55,10 +57,15 @@ export const useHabitStats = (): HabitStats => {
       checkDate = newDate;
     }
 
-    // Calcular racha más larga
+    // Calcular racha más larga (considerando requisitos de fin de semana)
     let longestStreak = 0;
     let tempStreak = 0;
-    const allDates = sortedHabits.map(h => h.date).sort();
+    const validHabits = dailyHabits.filter(h => {
+      const habitDate = new Date(h.date);
+      const requiredCount = getRequiredCategoryCount(habitDate);
+      return h.completedCategories >= requiredCount;
+    });
+    const allDates = validHabits.map(h => h.date).sort();
 
     for (let i = 0; i < allDates.length; i++) {
       if (i === 0) {

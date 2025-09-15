@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, getDateString } from '@/types/activity';
+import { Activity, CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, getDateString, isWeekend, getRequiredCategoriesForDate, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useHabitStats } from '@/hooks/useHabitStats';
 import { useToast } from '@/hooks/use-toast';
@@ -45,6 +45,8 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
   // Obtener o crear el hábito del día con auto-completado basado en actividades
   const todayHabit = useMemo(() => {
     const existing = dailyHabits.find(h => h.date === dateString);
+    const requiredCategories = getRequiredCategoriesForDate(selectedDate);
+    const requiredCategoryCount = getRequiredCategoryCount(selectedDate);
 
     // Crear progreso inicial considerando las actividades completadas
     const initialProgress = Object.keys(CATEGORIES).reduce((acc, category) => {
@@ -54,13 +56,14 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       return acc;
     }, {} as Record<CategoryType, boolean>);
 
-    const completedCount = Object.values(initialProgress).filter(Boolean).length;
+    // Contar solo las categorías requeridas para este día
+    const completedRequiredCount = requiredCategories.filter(cat => initialProgress[cat]).length;
     const totalHabitPoints = Object.entries(initialProgress).reduce((sum, [category, completed]) => {
       return sum + (completed ? CATEGORIES[category as CategoryType].points : 0);
     }, 0);
 
-    // Verificar si se merece el bonus
-    const bonusEarned = completedCount === TOTAL_CATEGORIES;
+    // Verificar si se merece el bonus (completar todas las categorías requeridas para el día)
+    const bonusEarned = completedRequiredCount === requiredCategoryCount;
     const totalPoints = totalHabitPoints + (bonusEarned ? BONUS_POINTS.DAILY_COMPLETE : 0);
 
     const habit: DailyHabit = {
@@ -68,11 +71,11 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       categoryProgress: initialProgress,
       bonusEarned,
       totalPoints,
-      completedCategories: completedCount,
+      completedCategories: completedRequiredCount,
     };
 
     return habit;
-  }, [dailyHabits, dateString, categoriesWithActivities]);
+  }, [dailyHabits, dateString, categoriesWithActivities, selectedDate]);
 
   // Efecto para sincronizar automáticamente los hábitos con las actividades
   useEffect(() => {
@@ -100,7 +103,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
   // Calcular progreso
   const progress = useMemo(() => {
     const completed = todayHabit.completedCategories;
-    const total = TOTAL_CATEGORIES;
+    const total = getRequiredCategoryCount(selectedDate);
     const percentage = (completed / total) * 100;
 
     return {
@@ -109,7 +112,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       percentage,
       isComplete: completed === total,
     };
-  }, [todayHabit.completedCategories]);
+  }, [todayHabit.completedCategories, selectedDate]);
 
   // Manejar toggle de categoría
   const toggleCategory = (category: CategoryType) => {
@@ -129,13 +132,16 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
     const wasCompleted = newProgress[category];
     newProgress[category] = !wasCompleted;
 
-    const completedCount = Object.values(newProgress).filter(Boolean).length;
+    const requiredCategories = getRequiredCategoriesForDate(selectedDate);
+    const requiredCategoryCount = getRequiredCategoryCount(selectedDate);
+    const completedRequiredCount = requiredCategories.filter(cat => newProgress[cat]).length;
+
     const categoryPoints = wasCompleted ? -CATEGORIES[category].points : CATEGORIES[category].points;
     let newTotalPoints = todayHabit.totalPoints + categoryPoints;
 
-    // Verificar si se ganó bonus por día completo
-    const wasComplete = todayHabit.completedCategories === TOTAL_CATEGORIES;
-    const isNowComplete = completedCount === TOTAL_CATEGORIES;
+    // Verificar si se ganó bonus por día completo (basado en categorías requeridas)
+    const wasComplete = todayHabit.completedCategories === requiredCategoryCount;
+    const isNowComplete = completedRequiredCount === requiredCategoryCount;
     const bonusChange = isNowComplete && !wasComplete ? BONUS_POINTS.DAILY_COMPLETE :
                        wasComplete && !isNowComplete ? -BONUS_POINTS.DAILY_COMPLETE : 0;
 
@@ -144,7 +150,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
     const updatedHabit: DailyHabit = {
       ...todayHabit,
       categoryProgress: newProgress,
-      completedCategories: completedCount,
+      completedCategories: completedRequiredCount,
       totalPoints: Math.max(0, newTotalPoints),
       bonusEarned: isNowComplete,
     };
@@ -168,7 +174,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
           title: HABIT_MESSAGES.DAILY_COMPLETE,
           description: `¡Bonus de ${BONUS_POINTS.DAILY_COMPLETE} puntos ganado! 🎉`,
         });
-      } else if (completedCount === 1) {
+      } else if (completedRequiredCount === 1) {
         toast({
           title: HABIT_MESSAGES.FIRST_HABIT,
           description: `+${CATEGORIES[category].points} puntos por ${CATEGORIES[category].label}`,
@@ -228,6 +234,9 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
           const isCompleted = todayHabit.categoryProgress[category];
           const isAutoCompleted = categoriesWithActivities.has(category);
           const canToggle = isToday && (!isAutoCompleted || !isCompleted);
+          const requiredCategories = getRequiredCategoriesForDate(selectedDate);
+          const isRequired = requiredCategories.includes(category);
+          const isWeekendDay = isWeekend(selectedDate);
 
           return (
             <div
@@ -238,8 +247,11 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   ? isAutoCompleted
                     ? "border-green-500/50 bg-green-500/10 dark:border-green-400/50 dark:bg-green-400/10"
                     : "border-primary bg-primary/5"
-                  : "border-border hover:border-muted-foreground/30",
-                !isToday && "opacity-70"
+                  : isRequired
+                  ? "border-border hover:border-muted-foreground/30"
+                  : "border-border/50 bg-muted/20",
+                !isToday && "opacity-70",
+                !isRequired && isWeekendDay && "opacity-60"
               )}
             >
               <div className="flex items-center gap-3">
@@ -273,12 +285,22 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                     isCompleted ? "text-foreground" : "text-muted-foreground"
                   )}>
                     {config.label}
+                    {!isRequired && isWeekendDay && (
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        • Opcional
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {config.points} puntos
                     {isAutoCompleted && isCompleted && (
                       <span className="ml-1 text-green-600 dark:text-green-400">
                         • Auto
+                      </span>
+                    )}
+                    {!isRequired && isWeekendDay && (
+                      <span className="ml-1 text-amber-600 dark:text-amber-400">
+                        • Fin de semana
                       </span>
                     )}
                   </p>
@@ -325,6 +347,11 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Te faltan {progress.total - progress.completed} categorías para el día perfecto
+                    {isWeekend(selectedDate) && (
+                      <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                        🎉 Fin de semana: Trabajo y Otros son opcionales
+                      </span>
+                    )}
                   </p>
                 </div>
               ) : (
@@ -334,6 +361,11 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Marca tu primera actividad para empezar
+                    {isWeekend(selectedDate) && (
+                      <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                        🎉 Fin de semana: Solo necesitas 4 categorías
+                      </span>
+                    )}
                   </p>
                 </div>
               )}
