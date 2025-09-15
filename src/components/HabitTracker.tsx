@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, getDateString, isWeekend, getRequiredCategoriesForDate, getRequiredCategoryCount } from '@/types/activity';
+import { Activity, CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, getDateString, getLocalDateString, isWeekend, getRequiredCategoriesForDate, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useHabitStats } from '@/hooks/useHabitStats';
 import { useToast } from '@/hooks/use-toast';
@@ -20,17 +20,25 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
   const habitStats = useHabitStats();
   const { toast } = useToast();
 
-  const dateString = getDateString(selectedDate);
-  const isToday = dateString === getDateString(new Date());
+  const dateString = getLocalDateString(selectedDate);
+  const isToday = dateString === getLocalDateString(new Date());
 
   // Obtener actividades completadas del día
   const dayActivities = useMemo(() => {
-    return activities.filter(activity => {
+    const filtered = activities.filter(activity => {
       const activityDate = activity.status === 'completed'
-        ? getDateString(new Date(activity.timestamp))
-        : getDateString(new Date(activity.plannedDate || activity.timestamp));
+        ? getLocalDateString(new Date(activity.timestamp))
+        : getLocalDateString(new Date(activity.plannedDate || activity.timestamp));
       return activityDate === dateString && activity.status === 'completed';
     });
+
+    // DEBUG: Log para entender qué actividades se detectan (remover después de verificar)
+    if (filtered.length > 0) {
+      console.log('✅ Activities found for date:', dateString,
+                  'Categories:', filtered.map(a => a.category));
+    }
+
+    return filtered;
   }, [activities, dateString]);
 
   // Obtener categorías que tienen al menos una actividad completada
@@ -39,6 +47,8 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
     dayActivities.forEach(activity => {
       categoriesSet.add(activity.category);
     });
+
+
     return categoriesSet;
   }, [dayActivities]);
 
@@ -65,6 +75,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
     // Verificar si se merece el bonus (completar todas las categorías requeridas para el día)
     const bonusEarned = completedRequiredCount === requiredCategoryCount;
     const totalPoints = totalHabitPoints + (bonusEarned ? BONUS_POINTS.DAILY_COMPLETE : 0);
+
 
     const habit: DailyHabit = {
       date: dateString,

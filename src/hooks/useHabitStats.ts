@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLocalStorage } from './useLocalStorage';
-import { DailyHabit, BONUS_POINTS, getDateString, getRequiredCategoryCount } from '@/types/activity';
+import { DailyHabit, BONUS_POINTS, getDateString, getLocalDateString, getRequiredCategoryCount } from '@/types/activity';
 
 interface HabitStats {
   currentStreak: number;
@@ -27,7 +27,7 @@ export const useHabitStats = (): HabitStats => {
 
     // Calcular racha actual
     let currentStreak = 0;
-    const todayString = getDateString(today);
+    const todayString = getLocalDateString(today);
     let checkDate = new Date(today);
 
     // Verificar si hoy cuenta para la racha (completó las categorías requeridas para hoy)
@@ -42,7 +42,7 @@ export const useHabitStats = (): HabitStats => {
 
     // Contar días consecutivos hacia atrás
     for (let i = 0; i < 100; i++) { // Máximo 100 días hacia atrás
-      const dateString = getDateString(checkDate);
+      const dateString = getLocalDateString(checkDate);
       const habit = dailyHabits.find(h => h.date === dateString);
       const dayRequiredCount = getRequiredCategoryCount(checkDate);
 
@@ -95,7 +95,7 @@ export const useHabitStats = (): HabitStats => {
     startOfWeek.setHours(0, 0, 0, 0);
 
     const thisWeekBonusDays = dailyHabits.filter(h => {
-      const habitDate = new Date(h.date);
+      const habitDate = new Date(h.date + 'T00:00:00'); // Convertir string fecha a Date local
       return habitDate >= startOfWeek && habitDate <= today && h.bonusEarned;
     }).length;
 
@@ -104,7 +104,7 @@ export const useHabitStats = (): HabitStats => {
     // Verificar bonus mensual (20+ días completos este mes)
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const thisMonthBonusDays = dailyHabits.filter(h => {
-      const habitDate = new Date(h.date);
+      const habitDate = new Date(h.date + 'T00:00:00'); // Convertir string fecha a Date local
       return habitDate >= startOfMonth && habitDate <= today && h.bonusEarned;
     }).length;
 
