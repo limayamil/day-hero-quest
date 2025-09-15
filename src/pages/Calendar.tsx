@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { CalendarDays, Plus, TrendingUp, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { getDateString } from '@/types/activity';
+import { getDateString, getLocalDateString } from '@/types/activity';
 
 const CalendarPage = () => {
   const [activities, setActivities] = useLocalStorage<Activity[]>('daily-activities', []);
@@ -35,7 +35,7 @@ const CalendarPage = () => {
       category,
       timestamp: targetDate < now ? targetDate : now,
       points: CATEGORIES[category].points,
-      status: targetDate.toDateString() === now.toDateString() ? 'completed' :
+      status: getLocalDateString(targetDate) === getLocalDateString(now) ? 'completed' :
               targetDate > now ? 'planned' : 'completed',
       plannedDate: targetDate,
     };
@@ -50,14 +50,14 @@ const CalendarPage = () => {
     setShowAddActivity(false);
   };
 
-  const isToday = getDateString(selectedDate) === getDateString(new Date());
-  const selectedDateString = getDateString(selectedDate);
+  const isToday = getLocalDateString(selectedDate) === getLocalDateString(new Date());
+  const selectedDateString = getLocalDateString(selectedDate);
 
   // Actividades del día seleccionado
   const selectedDayActivities = activities.filter(activity => {
     const activityDate = activity.status === 'completed'
-      ? getDateString(new Date(activity.timestamp))
-      : getDateString(new Date(activity.plannedDate || activity.timestamp));
+      ? getLocalDateString(new Date(activity.timestamp))
+      : getLocalDateString(new Date(activity.plannedDate || activity.timestamp));
     return activityDate === selectedDateString && activity.status === 'completed';
   });
 

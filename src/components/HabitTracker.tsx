@@ -32,11 +32,6 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       return activityDate === dateString && activity.status === 'completed';
     });
 
-    // DEBUG: Log para entender qué actividades se detectan (remover después de verificar)
-    if (filtered.length > 0) {
-      console.log('✅ Activities found for date:', dateString,
-                  'Categories:', filtered.map(a => a.category));
-    }
 
     return filtered;
   }, [activities, dateString]);

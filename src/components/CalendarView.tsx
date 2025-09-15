@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Activity, DailyHabit, CATEGORIES, TOTAL_CATEGORIES, getDateString } from '@/types/activity';
+import { Activity, DailyHabit, CATEGORIES, TOTAL_CATEGORIES, getDateString, getLocalDateString, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ export const CalendarView = ({ onDateSelect, selectedDate }: CalendarViewProps) 
   const [selectedDayDetail, setSelectedDayDetail] = useState<DayData | null>(null);
 
   const today = new Date();
-  const todayString = getDateString(today);
+  const todayString = getLocalDateString(today);
 
   // Obtener días del mes actual
   const calendarDays = useMemo(() => {
@@ -55,14 +55,14 @@ export const CalendarView = ({ onDateSelect, selectedDate }: CalendarViewProps) 
 
     // Generar 42 días (6 semanas)
     for (let i = 0; i < 42; i++) {
-      const dateString = getDateString(currentDate);
+      const dateString = getLocalDateString(currentDate);
 
       // Filtrar actividades del día
       const dayActivities = activities.filter(activity => {
         const activityDate = activity.status === 'completed'
-          ? new Date(activity.timestamp).toDateString()
-          : new Date(activity.plannedDate || activity.timestamp).toDateString();
-        return activityDate === currentDate.toDateString() && activity.status === 'completed';
+          ? getLocalDateString(new Date(activity.timestamp))
+          : getLocalDateString(new Date(activity.plannedDate || activity.timestamp));
+        return activityDate === dateString && activity.status === 'completed';
       });
 
       // Obtener hábitos del día
@@ -73,15 +73,16 @@ export const CalendarView = ({ onDateSelect, selectedDate }: CalendarViewProps) 
       const habitPoints = dayHabits?.totalPoints || 0;
       const totalPoints = activityPoints + habitPoints;
 
-      // Determinar nivel de completitud
+      // Determinar nivel de completitud (usando lógica de categorías requeridas)
       let completionLevel: DayData['completionLevel'] = 'empty';
       const hasActivities = dayActivities.length > 0;
       const hasHabits = dayHabits && dayHabits.completedCategories > 0;
       const hasBonus = dayHabits?.bonusEarned || false;
+      const requiredCategoriesCount = getRequiredCategoryCount(currentDate);
 
       if (hasBonus) {
         completionLevel = 'bonus';
-      } else if (hasActivities || (hasHabits && dayHabits.completedCategories === TOTAL_CATEGORIES)) {
+      } else if (hasActivities || (hasHabits && dayHabits.completedCategories === requiredCategoriesCount)) {
         completionLevel = 'complete';
       } else if (hasActivities || hasHabits) {
         completionLevel = 'partial';
@@ -92,7 +93,7 @@ export const CalendarView = ({ onDateSelect, selectedDate }: CalendarViewProps) 
         activities: dayActivities,
         habits: dayHabits,
         isToday: dateString === todayString,
-        isSelected: selectedDate ? getDateString(selectedDate) === dateString : false,
+        isSelected: selectedDate ? getLocalDateString(selectedDate) === dateString : false,
         totalPoints,
         hasBonus,
         completionLevel,
@@ -221,7 +222,7 @@ export const CalendarView = ({ onDateSelect, selectedDate }: CalendarViewProps) 
                   {dayData.hasBonus && (
                     <Star className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
                   )}
-                  {dayData.habits && dayData.habits.completedCategories === TOTAL_CATEGORIES && !dayData.hasBonus && (
+                  {dayData.habits && dayData.habits.completedCategories === getRequiredCategoryCount(dayData.date) && !dayData.hasBonus && (
                     <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
                   )}
                   {dayData.activities.length > 0 && (
@@ -316,7 +317,7 @@ export const CalendarView = ({ onDateSelect, selectedDate }: CalendarViewProps) 
               {selectedDayDetail.habits && (
                 <div className="space-y-2">
                   <h4 className="font-semibold">
-                    Hábitos ({selectedDayDetail.habits.completedCategories}/5)
+                    Hábitos ({selectedDayDetail.habits.completedCategories}/{getRequiredCategoryCount(selectedDayDetail.date)})
                   </h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {(Object.entries(CATEGORIES) as Array<[keyof typeof CATEGORIES, typeof CATEGORIES[keyof typeof CATEGORIES]]>).map(([category, config]) => (

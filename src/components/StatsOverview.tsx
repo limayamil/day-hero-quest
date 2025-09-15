@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Activity, DailyHabit, WeeklyStats, MonthlyStats, CATEGORIES, CategoryType, TOTAL_CATEGORIES, getDateString, getWeekStart, getMonthString } from '@/types/activity';
+import { Activity, DailyHabit, WeeklyStats, MonthlyStats, CATEGORIES, CategoryType, TOTAL_CATEGORIES, getDateString, getLocalDateString, getWeekStart, getMonthString, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,11 +24,11 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
 
   // Estadísticas diarias
   const dailyStats = useMemo(() => {
-    const todayString = getDateString(today);
+    const todayString = getLocalDateString(today);
     const todayActivities = activities.filter(activity => {
       const activityDate = activity.status === 'completed'
-        ? getDateString(new Date(activity.timestamp))
-        : getDateString(new Date(activity.plannedDate || activity.timestamp));
+        ? getLocalDateString(new Date(activity.timestamp))
+        : getLocalDateString(new Date(activity.plannedDate || activity.timestamp));
       return activityDate === todayString && activity.status === 'completed';
     });
 
@@ -59,7 +59,7 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
       habitCompletion: todayHabits?.completedCategories || 0,
       hasBonus: todayHabits?.bonusEarned || false,
       categoryBreakdown,
-      completionPercentage: todayHabits ? (todayHabits.completedCategories / TOTAL_CATEGORIES) * 100 : 0,
+      completionPercentage: todayHabits ? (todayHabits.completedCategories / getRequiredCategoryCount(today)) * 100 : 0,
     };
   }, [activities, dailyHabits, today]);
 
@@ -73,30 +73,32 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
 
     // Generar array de días de la semana
     for (let i = 0; i < 7; i++) {
-      weekDays.push(getDateString(currentDate));
+      weekDays.push(getLocalDateString(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
     const weekData = weekDays.map(dateString => {
+      const dayDate = new Date(dateString + 'T00:00:00'); // Convertir a fecha local
       const dayActivities = activities.filter(activity => {
         const activityDate = activity.status === 'completed'
-          ? getDateString(new Date(activity.timestamp))
-          : getDateString(new Date(activity.plannedDate || activity.timestamp));
+          ? getLocalDateString(new Date(activity.timestamp))
+          : getLocalDateString(new Date(activity.plannedDate || activity.timestamp));
         return activityDate === dateString && activity.status === 'completed';
       });
 
       const dayHabits = dailyHabits.find(h => h.date === dateString);
       const activityPoints = dayActivities.reduce((sum, activity) => sum + activity.points, 0);
       const habitPoints = dayHabits?.totalPoints || 0;
+      const requiredCategories = getRequiredCategoryCount(dayDate);
 
       return {
         date: dateString,
-        day: new Date(dateString).toLocaleDateString('es-ES', { weekday: 'short' }),
+        day: dayDate.toLocaleDateString('es-ES', { weekday: 'short' }),
         totalPoints: activityPoints + habitPoints,
         activities: dayActivities.length,
         habitCompletion: dayHabits?.completedCategories || 0,
         hasBonus: dayHabits?.bonusEarned || false,
-        isComplete: (dayHabits?.completedCategories || 0) === TOTAL_CATEGORIES,
+        isComplete: (dayHabits?.completedCategories || 0) === requiredCategories,
       };
     });
 
@@ -132,9 +134,13 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
     const totalHabitPoints = monthHabits.reduce((sum, habit) => sum + habit.totalPoints, 0);
     const totalPoints = totalActivityPoints + totalHabitPoints;
 
-    const completeDays = monthHabits.filter(h => h.completedCategories === TOTAL_CATEGORIES).length;
+    const completeDays = monthHabits.filter(h => {
+      const habitDate = new Date(h.date + 'T00:00:00');
+      const requiredCount = getRequiredCategoryCount(habitDate);
+      return h.completedCategories === requiredCount;
+    }).length;
     const activeDays = monthHabits.filter(h => h.completedCategories > 0).length +
-      new Set(monthActivities.map(a => getDateString(new Date(a.timestamp)))).size;
+      new Set(monthActivities.map(a => getLocalDateString(new Date(a.timestamp)))).size;
 
     const categoryDistribution = Object.keys(CATEGORIES).map(category => {
       const categoryActivities = monthActivities.filter(a => a.category === category as CategoryType);

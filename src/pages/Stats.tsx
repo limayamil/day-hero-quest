@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StatsOverview } from '@/components/StatsOverview';
-import { Activity, DailyHabit, CATEGORIES, BONUS_POINTS, getDateString } from '@/types/activity';
+import { Activity, DailyHabit, CATEGORIES, BONUS_POINTS, getDateString, getLocalDateString, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,7 @@ const Stats = () => {
 
     const totalBonusDays = dailyHabits.filter(h => h.bonusEarned).length;
     const totalActiveDays = new Set([
-      ...completedActivities.map(a => getDateString(new Date(a.timestamp))),
+      ...completedActivities.map(a => getLocalDateString(new Date(a.timestamp))),
       ...dailyHabits.filter(h => h.completedCategories > 0).map(h => h.date)
     ]).size;
 
@@ -36,12 +36,14 @@ const Stats = () => {
     const today = new Date();
     const checkDate = new Date(today);
 
-    // Calcular racha actual
+    // Calcular racha actual (usando categorías requeridas)
     for (let i = 0; i < 30; i++) { // Revisar últimos 30 días
-      const dateString = getDateString(checkDate);
-      const hasHabits = dailyHabits.find(h => h.date === dateString && h.completedCategories > 0);
+      const dateString = getLocalDateString(checkDate);
+      const dayHabit = dailyHabits.find(h => h.date === dateString);
+      const requiredCount = getRequiredCategoryCount(checkDate);
+      const hasCompleteDay = dayHabit && dayHabit.completedCategories >= requiredCount;
 
-      if (hasHabits) {
+      if (hasCompleteDay) {
         if (i === 0 || currentStreak > 0) currentStreak++;
       } else if (i > 0) {
         break;
@@ -312,7 +314,7 @@ const Stats = () => {
                 <p className="font-medium mb-2">Bonus Especiales:</p>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span>Día perfecto (6 categorías):</span>
+                    <span>Día perfecto (todas las categorías):</span>
                     <Badge variant="outline">+{BONUS_POINTS.DAILY_COMPLETE}pts</Badge>
                   </div>
                   <div className="flex justify-between">
