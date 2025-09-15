@@ -237,6 +237,8 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
           const requiredCategories = getRequiredCategoriesForDate(selectedDate);
           const isRequired = requiredCategories.includes(category);
           const isWeekendDay = isWeekend(selectedDate);
+          const isAlwaysOptional = category === 'otros';
+          const isWeekendOptional = category === 'laburo' && isWeekendDay;
 
           return (
             <div
@@ -251,7 +253,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   ? "border-border hover:border-muted-foreground/30"
                   : "border-border/50 bg-muted/20",
                 !isToday && "opacity-70",
-                !isRequired && isWeekendDay && "opacity-60"
+                !isRequired && "opacity-60"
               )}
             >
               <div className="flex items-center gap-3">
@@ -285,7 +287,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                     isCompleted ? "text-foreground" : "text-muted-foreground"
                   )}>
                     {config.label}
-                    {!isRequired && isWeekendDay && (
+                    {!isRequired && (
                       <span className="ml-1 text-xs font-normal text-muted-foreground">
                         • Opcional
                       </span>
@@ -298,7 +300,12 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                         • Auto
                       </span>
                     )}
-                    {!isRequired && isWeekendDay && (
+                    {isAlwaysOptional && (
+                      <span className="ml-1 text-amber-600 dark:text-amber-400">
+                        • Siempre opcional
+                      </span>
+                    )}
+                    {isWeekendOptional && (
                       <span className="ml-1 text-amber-600 dark:text-amber-400">
                         • Fin de semana
                       </span>
@@ -347,9 +354,13 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Te faltan {progress.total - progress.completed} categorías para el día perfecto
-                    {isWeekend(selectedDate) && (
+                    {isWeekend(selectedDate) ? (
                       <span className="block mt-1 text-amber-600 dark:text-amber-400">
-                        🎉 Fin de semana: Trabajo y Otros son opcionales
+                        🎉 Fin de semana: Trabajo opcional
+                      </span>
+                    ) : (
+                      <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                        💡 Otros siempre es opcional
                       </span>
                     )}
                   </p>
@@ -361,9 +372,13 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Marca tu primera actividad para empezar
-                    {isWeekend(selectedDate) && (
+                    {isWeekend(selectedDate) ? (
                       <span className="block mt-1 text-amber-600 dark:text-amber-400">
                         🎉 Fin de semana: Solo necesitas 4 categorías
+                      </span>
+                    ) : (
+                      <span className="block mt-1 text-amber-600 dark:text-amber-400">
+                        💡 Necesitas 5 categorías (Otros siempre opcional)
                       </span>
                     )}
                   </p>

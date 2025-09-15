@@ -158,12 +158,15 @@ export const isWeekend = (date: Date): boolean => {
 export const getRequiredCategoriesForDate = (date: Date): CategoryType[] => {
   const allCategories = Object.keys(CATEGORIES) as CategoryType[];
 
+  // 'otros' is always optional (not essential for habits)
+  let requiredCategories = allCategories.filter(cat => cat !== 'otros');
+
   if (isWeekend(date)) {
-    // On weekends, exclude 'laburo' and 'otros' from required categories
-    return allCategories.filter(cat => cat !== 'laburo' && cat !== 'otros');
+    // On weekends, also exclude 'laburo' from required categories
+    requiredCategories = requiredCategories.filter(cat => cat !== 'laburo');
   }
 
-  return allCategories; // All categories required on weekdays
+  return requiredCategories;
 };
 
 // Get total required categories count for a date
