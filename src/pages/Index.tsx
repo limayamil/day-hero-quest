@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, CategoryType, DailyStats, CATEGORIES } from '@/types/activity';
+import { Activity, CategoryType, DailyStats, DailyHabit, CATEGORIES, getLocalDateString } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ActivityForm } from '@/components/ActivityForm';
 import { ActivityCard } from '@/components/ActivityCard';
@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 
 const Index = () => {
   const [activities, setActivities] = useLocalStorage<Activity[]>('daily-activities', []);
+  const [dailyHabits] = useLocalStorage<DailyHabit[]>('daily-habits', []);
   const { toast } = useToast();
 
   const addActivity = (text: string, category: CategoryType, plannedDate?: Date) => {
@@ -125,16 +126,23 @@ const Index = () => {
   // Calcular estadísticas del día
   const todayStats: DailyStats = useMemo(() => {
     const totalActivities = todayActivities.length;
-    const totalPoints = todayActivities.reduce((sum, activity) => sum + activity.points, 0);
+    const activityPoints = todayActivities.reduce((sum, activity) => sum + activity.points, 0);
+
+    // Obtener puntos de hábitos del día actual
+    const todayString = getLocalDateString(new Date());
+    const todayHabit = dailyHabits.find(h => h.date === todayString);
+    const habitPoints = todayHabit?.totalPoints || 0;
+
+    const totalPoints = activityPoints + habitPoints;
     const categoriesUsed = Array.from(new Set(todayActivities.map(activity => activity.category)));
-    
+
     return {
       totalActivities,
       totalPoints,
       categoriesUsed,
       date: new Date().toISOString().split('T')[0],
     };
-  }, [todayActivities]);
+  }, [todayActivities, dailyHabits]);
 
   return (
     <div className="bg-background">
