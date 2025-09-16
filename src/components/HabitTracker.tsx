@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle2, Circle, Star, Flame, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { celebrateHabit, celebratePerfectDay } from '@/lib/confetti';
 
 interface HabitTrackerProps {
   selectedDate?: Date;
@@ -171,19 +172,22 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       }
     });
 
-    // Mostrar toast apropiado
+    // Mostrar toast apropiado y confetti
     if (!wasCompleted) {
       if (isNowComplete) {
+        celebratePerfectDay();
         toast({
           title: HABIT_MESSAGES.DAILY_COMPLETE,
           description: `¡Bonus de ${BONUS_POINTS.DAILY_COMPLETE} puntos ganado! 🎉`,
         });
       } else if (completedRequiredCount === 1) {
+        celebrateHabit();
         toast({
           title: HABIT_MESSAGES.FIRST_HABIT,
           description: `+${CATEGORIES[category].points} puntos por ${CATEGORIES[category].label}`,
         });
       } else {
+        celebrateHabit();
         toast({
           title: HABIT_MESSAGES.CATEGORY_COMPLETE.replace('{category}', CATEGORIES[category].label),
           description: `+${CATEGORIES[category].points} puntos`,

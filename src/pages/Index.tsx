@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { celebrateActivity } from '@/lib/confetti';
 
 const Index = () => {
   const [activities, setActivities] = useLocalStorage<Activity[]>('daily-activities', []);
@@ -56,6 +57,7 @@ const Index = () => {
 
     if (status === 'completed') {
       const isFromPast = plannedDate && plannedDate < today;
+      celebrateActivity();
       toast({
         title: isFromPast ? "¡Actividad del pasado registrada! 📝" : "¡Actividad completada! ✨",
         description: isFromPast
@@ -81,6 +83,7 @@ const Index = () => {
     
     const activity = activities.find(a => a.id === id);
     if (activity) {
+      celebrateActivity();
       toast({
         title: "¡Actividad completada! ✨",
         description: `+${activity.points} puntos por ${CATEGORIES[activity.category].label}`,
