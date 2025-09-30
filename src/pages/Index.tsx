@@ -137,7 +137,16 @@ const Index = () => {
     const habitPoints = todayHabit?.totalPoints || 0;
 
     const totalPoints = activityPoints + habitPoints;
-    const categoriesUsed = Array.from(new Set(todayActivities.map(activity => activity.category)));
+
+    // Combinar categorías de actividades completadas con categorías de hábitos marcados
+    const activityCategories = new Set(todayActivities.map(activity => activity.category));
+    const habitCategories = todayHabit
+      ? Object.entries(todayHabit.categoryProgress)
+          .filter(([_, completed]) => completed)
+          .map(([category, _]) => category as CategoryType)
+      : [];
+
+    const categoriesUsed = Array.from(new Set([...activityCategories, ...habitCategories]));
 
     return {
       totalActivities,
