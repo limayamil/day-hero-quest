@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, CategoryType, DailyStats, DailyHabit, CATEGORIES, getLocalDateString } from '@/types/activity';
+import { Activity, CategoryType, DailyStats, DailyHabit, CATEGORIES, getLocalDateString, getDateComparison } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ActivityForm } from '@/components/ActivityForm';
 import { ActivityCard } from '@/components/ActivityCard';
@@ -19,24 +19,20 @@ const Index = () => {
 
   const addActivity = (text: string, category: CategoryType, plannedDate?: Date) => {
     const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     let status: 'completed' | 'planned' = 'completed';
     let timestamp = now;
     const actualPlannedDate = plannedDate || now;
 
     if (plannedDate) {
-      const selectedDate = new Date(plannedDate);
-      selectedDate.setHours(0, 0, 0, 0);
+      const comparison = getDateComparison(plannedDate);
 
-      if (selectedDate > today) {
+      if (comparison === 'future') {
         // Fecha futura - actividad planificada
         status = 'planned';
-      } else if (selectedDate < today) {
+      } else if (comparison === 'past') {
         // Fecha pasada - actividad completada en el pasado
         status = 'completed';
-        timestamp = plannedDate; // Usar la fecha pasada como timestamp
+        timestamp = plannedDate;
       } else {
         // Fecha de hoy - actividad completada hoy
         status = 'completed';
@@ -56,7 +52,7 @@ const Index = () => {
     setActivities((prev) => [newActivity, ...prev]);
 
     if (status === 'completed') {
-      const isFromPast = plannedDate && plannedDate < today;
+      const isFromPast = plannedDate && getDateComparison(plannedDate) === 'past';
       celebrateActivity();
       toast({
         title: isFromPast ? "¡Actividad del pasado registrada! 📝" : "¡Actividad completada! ✨",
@@ -92,6 +88,8 @@ const Index = () => {
   };
 
   const cancelActivity = (id: string) => {
+    const activity = activities.find(a => a.id === id);
+
     setActivities((prev) =>
       prev.map((activity) =>
         activity.id === id
@@ -99,11 +97,13 @@ const Index = () => {
           : activity
       )
     );
-    
-    toast({
-      title: "Actividad cancelada",
-      description: "No te preocupes, siempre puedes intentarlo otro día",
-    });
+
+    if (activity) {
+      toast({
+        title: "Actividad cancelada",
+        description: `"${activity.text}" (${CATEGORIES[activity.category].label}) - No te preocupes, siempre puedes intentarlo otro día`,
+      });
+    }
   };
 
   // Obtener actividades del día actual
@@ -143,7 +143,7 @@ const Index = () => {
       totalActivities,
       totalPoints,
       categoriesUsed,
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(new Date()),
     };
   }, [todayActivities, dailyHabits]);
 

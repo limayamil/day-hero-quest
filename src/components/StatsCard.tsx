@@ -24,6 +24,10 @@ export function StatsCard({ stats, className }: StatsCardProps) {
     return 'text-black/70';
   };
 
+  // Parsear el string de fecha YYYY-MM-DD correctamente sin desfase UTC
+  const [year, month, day] = stats.date.split('-').map(Number);
+  const localDate = new Date(year, month - 1, day);
+
   return (
     <Card className={cn(
       'p-6 bg-success text-black shadow-strong',
@@ -37,7 +41,7 @@ export function StatsCard({ stats, className }: StatsCardProps) {
             <span className="font-medium">Hoy</span>
           </div>
           <Badge variant="secondary" className="bg-black/10 text-black border-black/20">
-            {new Date(stats.date).toLocaleDateString('es-ES', { 
+            {localDate.toLocaleDateString('es-ES', {
               weekday: 'short',
               day: 'numeric',
               month: 'short'

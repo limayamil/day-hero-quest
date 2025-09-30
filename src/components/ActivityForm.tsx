@@ -181,7 +181,13 @@ export function ActivityForm({ onAddActivity, defaultDate, compact = false }: Ac
                   mode="single"
                   selected={plannedDate}
                   onSelect={setPlannedDate}
-                  disabled={(date) => dateMode === 'future' ? date < today : date >= today}
+                  disabled={(date) => {
+                    const dateOnly = new Date(date);
+                    dateOnly.setHours(0, 0, 0, 0);
+                    const todayOnly = new Date(today);
+                    todayOnly.setHours(0, 0, 0, 0);
+                    return dateMode === 'future' ? dateOnly <= todayOnly : dateOnly >= todayOnly;
+                  }}
                   initialFocus
                   locale={es}
                 />

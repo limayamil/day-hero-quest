@@ -21,5 +21,22 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     }
   };
 
+  // Sincronizar cambios entre pestañas/ventanas
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === key && e.newValue !== null) {
+        try {
+          const newValue = JSON.parse(e.newValue);
+          setStoredValue(newValue);
+        } catch (error) {
+          console.error(`Error syncing localStorage key "${key}":`, error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [key]);
+
   return [storedValue, setValue] as const;
 }

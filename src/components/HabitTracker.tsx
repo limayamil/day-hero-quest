@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, getDateString, getLocalDateString, isWeekend, getRequiredCategoriesForDate, getRequiredCategoryCount } from '@/types/activity';
+import { Activity, CategoryType, CATEGORIES, DailyHabit, BONUS_POINTS, HABIT_MESSAGES, TOTAL_CATEGORIES, PREMIUM_HABITS, getDateString, getLocalDateString, isWeekend, getRequiredCategoriesForDate, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useHabitStats } from '@/hooks/useHabitStats';
 import { useToast } from '@/hooks/use-toast';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, Circle, Star, Flame, Target } from 'lucide-react';
+import { CheckCircle2, Circle, Star, Flame, Target, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { celebrateHabit, celebratePerfectDay } from '@/lib/confetti';
 
@@ -62,15 +62,26 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       return acc;
     }, {} as Record<CategoryType, boolean>);
 
+    // Inicializar premium habits con valores existentes o vacío
+    const premiumHabits = existing?.premiumHabits || {};
+
     // Contar solo las categorías requeridas para este día
     const completedRequiredCount = requiredCategories.filter(cat => initialProgress[cat]).length;
     const totalHabitPoints = Object.entries(initialProgress).reduce((sum, [category, completed]) => {
       return sum + (completed ? CATEGORIES[category as CategoryType].points : 0);
     }, 0);
 
+    // Sumar puntos de premium habits
+    const premiumHabitPoints = Object.entries(premiumHabits).reduce((sum, [habitId, completed]) => {
+      if (completed && PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS]) {
+        return sum + PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS].points;
+      }
+      return sum;
+    }, 0);
+
     // Verificar si se merece el bonus (completar todas las categorías requeridas para el día)
     const bonusEarned = completedRequiredCount === requiredCategoryCount;
-    const totalPoints = totalHabitPoints + (bonusEarned ? BONUS_POINTS.DAILY_COMPLETE : 0);
+    const totalPoints = totalHabitPoints + premiumHabitPoints + (bonusEarned ? BONUS_POINTS.DAILY_COMPLETE : 0);
 
 
     const habit: DailyHabit = {
@@ -79,6 +90,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       bonusEarned,
       totalPoints,
       completedCategories: completedRequiredCount,
+      premiumHabits,
     };
 
     return habit;
@@ -89,11 +101,12 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
     const existingHabit = dailyHabits.find(h => h.date === dateString);
 
     // Solo actualizar si hay cambios reales en el progreso
-    if (!existingHabit ||
-        JSON.stringify(existingHabit.categoryProgress) !== JSON.stringify(todayHabit.categoryProgress) ||
+    const hasChanges = !existingHabit ||
+        existingHabit.completedCategories !== todayHabit.completedCategories ||
         existingHabit.bonusEarned !== todayHabit.bonusEarned ||
-        existingHabit.totalPoints !== todayHabit.totalPoints) {
+        existingHabit.totalPoints !== todayHabit.totalPoints;
 
+    if (hasChanges) {
       setDailyHabits(prev => {
         const index = prev.findIndex(h => h.date === dateString);
         if (index >= 0) {
@@ -105,7 +118,8 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
         }
       });
     }
-  }, [todayHabit, dailyHabits, dateString, setDailyHabits]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateString, todayHabit.completedCategories, todayHabit.bonusEarned, todayHabit.totalPoints]);
 
   // Calcular progreso
   const progress = useMemo(() => {
@@ -120,6 +134,52 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       isComplete: completed === total,
     };
   }, [todayHabit.completedCategories, selectedDate]);
+
+  // Manejar toggle de premium habit
+  const togglePremiumHabit = (habitId: string) => {
+    const habit = PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS];
+    if (!habit) return;
+
+    const newPremiumHabits = { ...todayHabit.premiumHabits };
+    const wasCompleted = newPremiumHabits[habitId] || false;
+    newPremiumHabits[habitId] = !wasCompleted;
+
+    const pointsChange = wasCompleted ? -habit.points : habit.points;
+    const newTotalPoints = Math.max(0, todayHabit.totalPoints + pointsChange);
+
+    const updatedHabit: DailyHabit = {
+      ...todayHabit,
+      premiumHabits: newPremiumHabits,
+      totalPoints: newTotalPoints,
+    };
+
+    // Actualizar en el estado
+    setDailyHabits(prev => {
+      const existing = prev.findIndex(h => h.date === dateString);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = updatedHabit;
+        return updated;
+      } else {
+        return [...prev, updatedHabit];
+      }
+    });
+
+    // Mostrar toast y confetti
+    if (!wasCompleted) {
+      celebratePerfectDay(); // Usar la celebración más grande para habits premium
+      toast({
+        title: `✨ ${habit.label} completado!`,
+        description: `+${habit.points} puntos premium 💎`,
+      });
+    } else {
+      toast({
+        title: "Hábito premium desmarcado",
+        description: `${habit.label} pendiente para hoy`,
+        variant: "destructive",
+      });
+    }
+  };
 
   // Manejar toggle de categoría
   const toggleCategory = (category: CategoryType) => {
@@ -238,6 +298,93 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
       </CardHeader>
 
       <CardContent className="space-y-3">
+        {/* Premium Habits Section */}
+        <div className="mb-6">
+          <div className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+            <Crown className="w-4 h-4 text-yellow-500" />
+            HÁBITOS PREMIUM
+          </div>
+          {Object.entries(PREMIUM_HABITS).map(([habitId, habitConfig]) => {
+            const isCompleted = todayHabit.premiumHabits?.[habitId] || false;
+
+            return (
+              <div
+                key={habitId}
+                className={cn(
+                  "relative p-4 rounded-xl border-2 transition-all duration-300 overflow-hidden",
+                  "bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-yellow-500/10",
+                  "dark:from-purple-500/20 dark:via-pink-500/20 dark:to-yellow-500/20",
+                  isCompleted
+                    ? "border-transparent shadow-lg shadow-yellow-500/20 animate-pulse-success"
+                    : "border-yellow-500/30 hover:border-yellow-500/50 hover:shadow-md"
+                )}
+              >
+                {/* Decorative gradient overlay */}
+                <div className={cn(
+                  "absolute inset-0 bg-gradient-to-r from-yellow-400/0 via-yellow-400/10 to-yellow-400/0",
+                  "opacity-0 transition-opacity duration-300",
+                  isCompleted && "opacity-100"
+                )} />
+
+                <div className="relative flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className={cn(
+                        "p-0 h-8 w-8 rounded-full flex-shrink-0",
+                        "hover:scale-110 transition-transform duration-200"
+                      )}
+                      onClick={() => togglePremiumHabit(habitId)}
+                    >
+                      {isCompleted ? (
+                        <div className="relative">
+                          <CheckCircle2 className="w-7 h-7 text-yellow-500 drop-shadow-lg" />
+                          <div className="absolute inset-0 bg-yellow-400/30 rounded-full blur-md" />
+                        </div>
+                      ) : (
+                        <Circle className="w-7 h-7 text-yellow-500/50" />
+                      )}
+                    </Button>
+
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-lg flex-shrink-0">{habitConfig.icon}</span>
+                      <p className={cn(
+                        "font-bold truncate",
+                        isCompleted ? "text-foreground" : "text-muted-foreground"
+                      )}>
+                        {habitConfig.label}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right flex-shrink-0">
+                    <div className={cn(
+                      "text-xl font-bold",
+                      isCompleted
+                        ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600"
+                        : "text-muted-foreground"
+                    )}>
+                      {habitConfig.points}
+                    </div>
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">pts</div>
+                  </div>
+                </div>
+
+                {isCompleted && (
+                  <div className="absolute top-2 right-2">
+                    <Star className="w-5 h-5 text-yellow-400 animate-bounce-gentle" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Category Habits Section */}
+        <div className="text-xs font-semibold text-muted-foreground mb-3">
+          HÁBITOS DIARIOS
+        </div>
         {(Object.entries(CATEGORIES) as Array<[CategoryType, typeof CATEGORIES[CategoryType]]>).map(([category, config]) => {
           const isCompleted = todayHabit.categoryProgress[category];
           const isAutoCompleted = categoriesWithActivities.has(category);

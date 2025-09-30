@@ -4,19 +4,19 @@ import { WifiOff, Wifi } from 'lucide-react';
 
 export function OfflineIndicator() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [showOffline, setShowOffline] = useState(false);
+  const [showReconnected, setShowReconnected] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      setShowOffline(false);
+      setShowReconnected(true);
+      // Auto-hide reconnected message after 5 seconds
+      setTimeout(() => setShowReconnected(false), 5000);
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      setShowOffline(true);
-      // Auto-hide after 5 seconds
-      setTimeout(() => setShowOffline(false), 5000);
+      setShowReconnected(false);
     };
 
     window.addEventListener('online', handleOnline);
@@ -28,7 +28,8 @@ export function OfflineIndicator() {
     };
   }, []);
 
-  if (!showOffline && isOnline) return null;
+  // Mostrar siempre cuando esté offline, o temporalmente cuando se reconecte
+  if (isOnline && !showReconnected) return null;
 
   return (
     <div className="fixed top-4 left-4 right-4 z-50 flex justify-center">

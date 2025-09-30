@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Activity, DailyHabit, WeeklyStats, MonthlyStats, CATEGORIES, CategoryType, TOTAL_CATEGORIES, getDateString, getLocalDateString, getWeekStart, getMonthString, getRequiredCategoryCount } from '@/types/activity';
+import { Activity, DailyHabit, WeeklyStats, MonthlyStats, CATEGORIES, CategoryType, TOTAL_CATEGORIES, getLocalDateString, getWeekStart, getLocalMonthString, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,7 +20,7 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
 
   const today = useMemo(() => new Date(), []);
   const currentWeekStart = useMemo(() => getWeekStart(today), [today]);
-  const currentMonth = useMemo(() => getMonthString(today), [today]);
+  const currentMonth = useMemo(() => getLocalMonthString(today), [today]);
 
   // Estadísticas diarias
   const dailyStats = useMemo(() => {

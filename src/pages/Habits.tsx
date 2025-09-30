@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Target, TrendingUp } from 'lucide-react';
-import { getDateString } from '@/types/activity';
+import { getLocalDateString } from '@/types/activity';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -15,7 +15,7 @@ const Habits = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const isToday = getDateString(selectedDate) === getDateString(new Date());
+  const isToday = getLocalDateString(selectedDate) === getLocalDateString(new Date());
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {

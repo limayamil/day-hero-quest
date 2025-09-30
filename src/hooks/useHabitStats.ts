@@ -30,31 +30,34 @@ export const useHabitStats = (): HabitStats => {
     const todayString = getLocalDateString(today);
     let checkDate = new Date(today);
 
-    // Verificar si hoy cuenta para la racha (completó las categorías requeridas para hoy)
+    // Verificar si hoy cuenta para la racha
     const todayHabit = dailyHabits.find(h => h.date === todayString);
     const todayRequiredCount = getRequiredCategoryCount(today);
-    if (todayHabit && todayHabit.completedCategories >= todayRequiredCount) {
+    const todayComplete = todayHabit && todayHabit.completedCategories >= todayRequiredCount;
+
+    if (todayComplete) {
       currentStreak = 1;
-      const newCheckDate = new Date(checkDate);
-      newCheckDate.setDate(newCheckDate.getDate() - 1);
-      checkDate = newCheckDate;
     }
 
-    // Contar días consecutivos hacia atrás
-    for (let i = 0; i < 100; i++) { // Máximo 100 días hacia atrás
+    // Contar días consecutivos hacia atrás desde ayer
+    checkDate.setDate(checkDate.getDate() - 1);
+    for (let i = 0; i < 100; i++) {
       const dateString = getLocalDateString(checkDate);
       const habit = dailyHabits.find(h => h.date === dateString);
       const dayRequiredCount = getRequiredCategoryCount(checkDate);
 
       if (habit && habit.completedCategories >= dayRequiredCount) {
-        if (currentStreak > 0 || i === 0) currentStreak++;
-      } else if (i > 0 || currentStreak === 0) {
+        currentStreak++;
+      } else {
+        // Si hoy no está completo, permitir racha de ayer
+        if (!todayComplete && i === 0) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          continue;
+        }
         break;
       }
 
-      const newDate = new Date(checkDate);
-      newDate.setDate(newDate.getDate() - 1);
-      checkDate = newDate;
+      checkDate.setDate(checkDate.getDate() - 1);
     }
 
     // Calcular racha más larga (considerando requisitos de fin de semana)

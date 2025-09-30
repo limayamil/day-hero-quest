@@ -35,6 +35,7 @@ export interface DailyHabit {
   bonusEarned: boolean;
   totalPoints: number;
   completedCategories: number;
+  premiumHabits?: Record<string, boolean>; // Track premium habits like "sin tentación"
 }
 
 export interface HabitStreak {
@@ -120,6 +121,17 @@ export const BONUS_POINTS = {
   STREAK_30_DAYS: 300,   // Bonus por racha de 30 días
 } as const;
 
+// Premium Habits Configuration
+export const PREMIUM_HABITS = {
+  sin_tentacion: {
+    id: 'sin_tentacion',
+    label: 'Sin Tentación',
+    description: 'Resististe todas las tentaciones hoy',
+    points: 50,
+    icon: '💎',
+  }
+} as const;
+
 // Número total de categorías para el cálculo de bonus
 export const TOTAL_CATEGORIES = 6;
 
@@ -133,6 +145,9 @@ export const HABIT_MESSAGES = {
 } as const;
 
 // Utilidades para fechas
+/**
+ * @deprecated Use getLocalDateString() instead to avoid timezone issues
+ */
 export const getDateString = (date: Date = new Date()): string => {
   return date.toISOString().split('T')[0];
 };
@@ -152,8 +167,18 @@ export const getWeekStart = (date: Date): Date => {
   return new Date(d.setDate(diff));
 };
 
+/**
+ * @deprecated Use getLocalMonthString() instead to avoid timezone issues
+ */
 export const getMonthString = (date: Date = new Date()): string => {
   return date.toISOString().slice(0, 7); // YYYY-MM
+};
+
+// Función para obtener el mes local (sin desfase de zona horaria)
+export const getLocalMonthString = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
 };
 
 // Weekend detection utilities
@@ -180,4 +205,31 @@ export const getRequiredCategoriesForDate = (date: Date): CategoryType[] => {
 // Get total required categories count for a date
 export const getRequiredCategoryCount = (date: Date): number => {
   return getRequiredCategoriesForDate(date).length;
+};
+
+// Comparison utilities for dates (timezone-safe)
+export const isSameDay = (date1: Date, date2: Date): boolean => {
+  return getLocalDateString(date1) === getLocalDateString(date2);
+};
+
+export const isBeforeDay = (date1: Date, date2: Date): boolean => {
+  const d1 = new Date(date1);
+  d1.setHours(0, 0, 0, 0);
+  const d2 = new Date(date2);
+  d2.setHours(0, 0, 0, 0);
+  return d1 < d2;
+};
+
+export const isAfterDay = (date1: Date, date2: Date): boolean => {
+  const d1 = new Date(date1);
+  d1.setHours(0, 0, 0, 0);
+  const d2 = new Date(date2);
+  d2.setHours(0, 0, 0, 0);
+  return d1 > d2;
+};
+
+export const getDateComparison = (date: Date, referenceDate: Date = new Date()): 'past' | 'today' | 'future' => {
+  if (isSameDay(date, referenceDate)) return 'today';
+  if (isBeforeDay(date, referenceDate)) return 'past';
+  return 'future';
 };

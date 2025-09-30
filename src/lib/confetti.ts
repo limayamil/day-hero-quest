@@ -103,6 +103,7 @@ export const createEmojiConfetti = (options: ConfettiOptions = {}) => {
       // Agregar keyframes al documento
       const style = document.createElement('style');
       style.textContent = keyframes;
+      style.dataset.confettiStyle = animationName; // Marcar para identificar
       document.head.appendChild(style);
 
       // Aplicar la animación con curva de aceleración más realista
@@ -112,6 +113,9 @@ export const createEmojiConfetti = (options: ConfettiOptions = {}) => {
 
       // Limpiar después de la animación
       setTimeout(() => {
+        if (particle.parentNode) {
+          container.removeChild(particle);
+        }
         if (style.parentNode) {
           document.head.removeChild(style);
         }
