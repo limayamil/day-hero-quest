@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, Circle, Star, Flame, Target, Crown } from 'lucide-react';
+import { CheckCircle2, Circle, Star, Flame, Target, Crown, Edit3, CheckCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { celebrateHabit, celebratePerfectDay } from '@/lib/confetti';
 
@@ -20,6 +20,11 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
   const [dailyHabits, setDailyHabits] = useLocalStorage<DailyHabit[]>('daily-habits', []);
   const habitStats = useHabitStats();
   const { toast } = useToast();
+
+  // Estado para modo de edición rápida
+  const [quickEditMode, setQuickEditMode] = useState(false);
+  const [tempCategoryProgress, setTempCategoryProgress] = useState<Record<CategoryType, boolean>>({} as Record<CategoryType, boolean>);
+  const [tempPremiumHabits, setTempPremiumHabits] = useState<Record<string, boolean>>({});
 
   const dateString = getLocalDateString(selectedDate);
   const isToday = dateString === getLocalDateString(new Date());
@@ -135,7 +140,122 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
     };
   }, [todayHabit.completedCategories, selectedDate]);
 
-  // Manejar toggle de premium habit
+  // Inicializar el modo de edición rápida
+  const enterQuickEditMode = () => {
+    setTempCategoryProgress({ ...todayHabit.categoryProgress });
+    setTempPremiumHabits({ ...todayHabit.premiumHabits });
+    setQuickEditMode(true);
+  };
+
+  // Salir del modo de edición rápida sin guardar
+  const cancelQuickEdit = () => {
+    setQuickEditMode(false);
+    setTempCategoryProgress({} as Record<CategoryType, boolean>);
+    setTempPremiumHabits({});
+  };
+
+  // Marcar todas las categorías requeridas en modo edición
+  const selectAllRequired = () => {
+    const requiredCategories = getRequiredCategoriesForDate(selectedDate);
+    const newProgress = { ...tempCategoryProgress };
+
+    requiredCategories.forEach(cat => {
+      newProgress[cat] = true;
+    });
+
+    setTempCategoryProgress(newProgress);
+  };
+
+  // Limpiar todas las selecciones en modo edición
+  const clearAllSelections = () => {
+    const newProgress = Object.keys(CATEGORIES).reduce((acc, category) => {
+      const categoryKey = category as CategoryType;
+      // Mantener solo las que están auto-completadas por actividades
+      acc[categoryKey] = categoriesWithActivities.has(categoryKey);
+      return acc;
+    }, {} as Record<CategoryType, boolean>);
+
+    setTempCategoryProgress(newProgress);
+    setTempPremiumHabits({});
+  };
+
+  // Guardar todos los cambios del modo edición rápida
+  const saveQuickEdit = () => {
+    const requiredCategories = getRequiredCategoriesForDate(selectedDate);
+    const requiredCategoryCount = getRequiredCategoryCount(selectedDate);
+    const completedRequiredCount = requiredCategories.filter(cat => tempCategoryProgress[cat]).length;
+
+    // Calcular puntos
+    const categoryPoints = Object.entries(tempCategoryProgress).reduce((sum, [category, completed]) => {
+      return sum + (completed ? CATEGORIES[category as CategoryType].points : 0);
+    }, 0);
+
+    const premiumHabitPoints = Object.entries(tempPremiumHabits).reduce((sum, [habitId, completed]) => {
+      if (completed && PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS]) {
+        return sum + PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS].points;
+      }
+      return sum;
+    }, 0);
+
+    const bonusEarned = completedRequiredCount === requiredCategoryCount;
+    const totalPoints = categoryPoints + premiumHabitPoints + (bonusEarned ? BONUS_POINTS.DAILY_COMPLETE : 0);
+
+    const updatedHabit: DailyHabit = {
+      date: dateString,
+      categoryProgress: tempCategoryProgress,
+      bonusEarned,
+      totalPoints,
+      completedCategories: completedRequiredCount,
+      premiumHabits: tempPremiumHabits,
+    };
+
+    // Actualizar en el estado
+    setDailyHabits(prev => {
+      const existing = prev.findIndex(h => h.date === dateString);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = updatedHabit;
+        return updated;
+      } else {
+        return [...prev, updatedHabit];
+      }
+    });
+
+    setQuickEditMode(false);
+
+    toast({
+      title: "Hábitos guardados",
+      description: `${completedRequiredCount} de ${requiredCategoryCount} categorías completadas (${totalPoints} pts)`,
+    });
+  };
+
+  // Toggle de categoría en modo edición rápida
+  const toggleCategoryQuickEdit = (category: CategoryType) => {
+    // Si está auto-completada, no se puede desmarcar
+    if (categoriesWithActivities.has(category) && tempCategoryProgress[category]) {
+      toast({
+        title: "No se puede desmarcar",
+        description: `Ya tienes actividades registradas en ${CATEGORIES[category].label}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTempCategoryProgress(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
+  // Toggle de premium habit en modo edición rápida
+  const togglePremiumHabitQuickEdit = (habitId: string) => {
+    setTempPremiumHabits(prev => ({
+      ...prev,
+      [habitId]: !prev[habitId]
+    }));
+  };
+
+  // Manejar toggle de premium habit (modo normal)
   const togglePremiumHabit = (habitId: string) => {
     const habit = PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS];
     if (!habit) return;
@@ -265,23 +385,64 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
   return (
     <Card className="w-full">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1">
             <CardTitle className="text-lg">
               {isToday ? 'Hábitos de Hoy' : `Hábitos del ${selectedDate.toLocaleDateString('es-ES')}`}
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {progress.completed} de {progress.total} categorías completadas
+              {quickEditMode
+                ? `Editando: ${Object.values(tempCategoryProgress).filter(Boolean).length} de ${progress.total} categorías`
+                : `${progress.completed} de ${progress.total} categorías completadas`
+              }
             </p>
           </div>
 
-          {todayHabit.bonusEarned && (
-            <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-yellow-900">
-              <Star className="w-4 h-4 mr-1" />
-              Bonus
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {!quickEditMode && todayHabit.bonusEarned && (
+              <Badge className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-yellow-900">
+                <Star className="w-4 h-4 mr-1" />
+                Bonus
+              </Badge>
+            )}
+
+            {!isToday && !quickEditMode && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={enterQuickEditMode}
+                className="gap-2"
+              >
+                <Edit3 className="w-4 h-4" />
+                Edición Rápida
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Botones de acción rápida cuando está en modo edición */}
+        {quickEditMode && (
+          <div className="flex gap-2 mb-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={selectAllRequired}
+              className="flex-1 gap-2"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Marcar Todos
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearAllSelections}
+              className="flex-1 gap-2"
+            >
+              <X className="w-4 h-4" />
+              Limpiar
+            </Button>
+          </div>
+        )}
 
         {/* Barra de progreso */}
         <div className="space-y-2">
@@ -305,26 +466,33 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
             HÁBITOS PREMIUM
           </div>
           {Object.entries(PREMIUM_HABITS).map(([habitId, habitConfig]) => {
-            const isCompleted = todayHabit.premiumHabits?.[habitId] || false;
+            const isCompleted = quickEditMode
+              ? tempPremiumHabits[habitId] || false
+              : todayHabit.premiumHabits?.[habitId] || false;
 
             return (
               <div
                 key={habitId}
                 className={cn(
                   "relative p-4 rounded-xl border-2 transition-all duration-300 overflow-hidden",
-                  "bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-yellow-500/10",
-                  "dark:from-purple-500/20 dark:via-pink-500/20 dark:to-yellow-500/20",
+                  quickEditMode
+                    ? "bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-yellow-500/5 dark:from-purple-500/10 dark:via-pink-500/10 dark:to-yellow-500/10"
+                    : "bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-yellow-500/10 dark:from-purple-500/20 dark:via-pink-500/20 dark:to-yellow-500/20",
                   isCompleted
-                    ? "border-transparent shadow-lg shadow-yellow-500/20 animate-pulse-success"
+                    ? quickEditMode
+                      ? "border-yellow-500/50 bg-yellow-500/5"
+                      : "border-transparent shadow-lg shadow-yellow-500/20 animate-pulse-success"
                     : "border-yellow-500/30 hover:border-yellow-500/50 hover:shadow-md"
                 )}
               >
                 {/* Decorative gradient overlay */}
-                <div className={cn(
-                  "absolute inset-0 bg-gradient-to-r from-yellow-400/0 via-yellow-400/10 to-yellow-400/0",
-                  "opacity-0 transition-opacity duration-300",
-                  isCompleted && "opacity-100"
-                )} />
+                {!quickEditMode && (
+                  <div className={cn(
+                    "absolute inset-0 bg-gradient-to-r from-yellow-400/0 via-yellow-400/10 to-yellow-400/0",
+                    "opacity-0 transition-opacity duration-300",
+                    isCompleted && "opacity-100"
+                  )} />
+                )}
 
                 <div className="relative flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -333,14 +501,19 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                       variant="ghost"
                       className={cn(
                         "p-0 h-8 w-8 rounded-full flex-shrink-0",
-                        "hover:scale-110 transition-transform duration-200"
+                        !quickEditMode && "hover:scale-110 transition-transform duration-200"
                       )}
-                      onClick={() => togglePremiumHabit(habitId)}
+                      onClick={() => quickEditMode ? togglePremiumHabitQuickEdit(habitId) : togglePremiumHabit(habitId)}
                     >
                       {isCompleted ? (
                         <div className="relative">
-                          <CheckCircle2 className="w-7 h-7 text-yellow-500 drop-shadow-lg" />
-                          <div className="absolute inset-0 bg-yellow-400/30 rounded-full blur-md" />
+                          <CheckCircle2 className={cn(
+                            "w-7 h-7 drop-shadow-lg",
+                            quickEditMode ? "text-yellow-600" : "text-yellow-500"
+                          )} />
+                          {!quickEditMode && (
+                            <div className="absolute inset-0 bg-yellow-400/30 rounded-full blur-md" />
+                          )}
                         </div>
                       ) : (
                         <Circle className="w-7 h-7 text-yellow-500/50" />
@@ -362,7 +535,9 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                     <div className={cn(
                       "text-xl font-bold",
                       isCompleted
-                        ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600"
+                        ? quickEditMode
+                          ? "text-yellow-600"
+                          : "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600"
                         : "text-muted-foreground"
                     )}>
                       {habitConfig.points}
@@ -371,7 +546,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   </div>
                 </div>
 
-                {isCompleted && (
+                {isCompleted && !quickEditMode && (
                   <div className="absolute top-2 right-2">
                     <Star className="w-5 h-5 text-yellow-400 animate-bounce-gentle" />
                   </div>
@@ -386,7 +561,9 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
           HÁBITOS DIARIOS
         </div>
         {(Object.entries(CATEGORIES) as Array<[CategoryType, typeof CATEGORIES[CategoryType]]>).map(([category, config]) => {
-          const isCompleted = todayHabit.categoryProgress[category];
+          const isCompleted = quickEditMode
+            ? tempCategoryProgress[category] || false
+            : todayHabit.categoryProgress[category];
           const isAutoCompleted = categoriesWithActivities.has(category);
           const canToggle = !isAutoCompleted || !isCompleted;
           const requiredCategories = getRequiredCategoriesForDate(selectedDate);
@@ -400,7 +577,13 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
               key={category}
               className={cn(
                 "flex items-center justify-between p-4 rounded-lg border-2 transition-all duration-200",
-                isCompleted
+                quickEditMode
+                  ? isCompleted
+                    ? "border-primary bg-primary/10"
+                    : isRequired
+                    ? "border-border hover:border-primary/50"
+                    : "border-border/50 bg-muted/20"
+                  : isCompleted
                   ? isAutoCompleted
                     ? "border-green-500/50 bg-green-500/10 dark:border-green-400/50 dark:bg-green-400/10"
                     : "border-primary bg-primary/5"
@@ -418,14 +601,16 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                     "p-0 h-8 w-8",
                     !canToggle && "cursor-not-allowed opacity-60"
                   )}
-                  onClick={() => toggleCategory(category)}
+                  onClick={() => quickEditMode ? toggleCategoryQuickEdit(category) : toggleCategory(category)}
                   disabled={!canToggle}
                 >
                   {isCompleted ? (
                     <CheckCircle2
                       className={cn(
                         "w-6 h-6",
-                        isAutoCompleted
+                        quickEditMode
+                          ? "text-primary"
+                          : isAutoCompleted
                           ? "text-green-600 dark:text-green-400"
                           : "text-primary"
                       )}
@@ -449,7 +634,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {config.points} puntos
-                    {isAutoCompleted && isCompleted && (
+                    {!quickEditMode && isAutoCompleted && isCompleted && (
                       <span className="ml-1 text-green-600 dark:text-green-400">
                         • Auto
                       </span>
@@ -468,7 +653,7 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
                 </div>
               </div>
 
-              {isCompleted && (
+              {isCompleted && !quickEditMode && (
                 <Badge
                   variant="secondary"
                   className={cn(
@@ -484,8 +669,31 @@ export const HabitTracker = ({ selectedDate = new Date() }: HabitTrackerProps) =
           );
         })}
 
+        {/* Botones de acción cuando está en modo edición */}
+        {quickEditMode && (
+          <div className="flex gap-2 mt-6 pt-4 border-t">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={cancelQuickEdit}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="default"
+              size="lg"
+              onClick={saveQuickEdit}
+              className="flex-1 gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Guardar Cambios
+            </Button>
+          </div>
+        )}
+
         {/* Mensaje motivacional */}
-        {isToday && (
+        {isToday && !quickEditMode && (
           <div className="mt-6 space-y-4">
             <div className="p-4 bg-muted/30 rounded-lg text-center">
               {progress.isComplete ? (

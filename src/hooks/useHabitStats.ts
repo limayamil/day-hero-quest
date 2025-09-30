@@ -28,7 +28,7 @@ export const useHabitStats = (): HabitStats => {
     // Calcular racha actual
     let currentStreak = 0;
     const todayString = getLocalDateString(today);
-    let checkDate = new Date(today);
+    const checkDate = new Date(today);
 
     // Verificar si hoy cuenta para la racha
     const todayHabit = dailyHabits.find(h => h.date === todayString);
