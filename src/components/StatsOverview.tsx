@@ -123,6 +123,7 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
   const monthlyStats = useMemo(() => {
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
 
     const monthActivities = activities.filter(activity => {
       if (activity.status !== 'completed') return false;
@@ -164,16 +165,20 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
 
     // Datos para el gráfico diario del mes (línea)
     const daysInMonth: { day: number; date: string; points: number; activities: number; habits: number; premium: number; hasBonus: boolean }[] = [];
-    const daysCount = monthEnd.getDate();
+    const daysCount = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 
     for (let day = 1; day <= daysCount; day++) {
       const dayDate = new Date(today.getFullYear(), today.getMonth(), day);
       const dayString = getLocalDateString(dayDate);
 
-      const dayActivities = monthActivities.filter(a =>
-        getLocalDateString(new Date(a.timestamp)) === dayString
-      );
-      const dayHabit = monthHabits.find(h => h.date === dayString);
+      // Buscar directamente en todas las actividades con filtro explícito
+      const dayActivities = activities.filter(a => {
+        if (a.status !== 'completed') return false;
+        const activityDateString = getLocalDateString(new Date(a.timestamp));
+        return activityDateString === dayString;
+      });
+
+      const dayHabit = dailyHabits.find(h => h.date === dayString);
 
       const activityPoints = dayActivities.reduce((sum, a) => sum + a.points, 0);
       const habitPoints = dayHabit?.totalPoints || 0;
