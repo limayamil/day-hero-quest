@@ -198,56 +198,71 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
     }
 
     // Datos para el gráfico semanal del mes (comparativa)
-    const weeksInMonth: { week: string; weekNum: number; points: number; activeDays: number; perfectDays: number; premiumHabits: number; }[] = [];
-    const currentDate = new Date(monthStart);
+    const weeksInMonth: { week: string; weekNum: number; points: number; activeDays: number; perfectDays: number; premiumHabits: number; startDate: string; endDate: string; }[] = [];
+
+    // Encontrar la primera semana que contiene días del mes
+    const firstDayOfMonth = new Date(monthStart);
+    let weekStart = getWeekStart(firstDayOfMonth);
     let weekNumber = 1;
 
-    while (currentDate <= monthEnd) {
-      const weekStart = getWeekStart(currentDate);
+    // Iterar por semanas hasta que pasemos el último día del mes
+    while (weekStart <= monthEnd) {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
 
-      const weekActivities = activities.filter(a => {
-        if (a.status !== 'completed') return false;
-        const activityDateString = getLocalDateString(new Date(a.timestamp));
-        const activityDate = new Date(activityDateString + 'T00:00:00');
-        return activityDate >= weekStart && activityDate <= weekEnd;
-      });
+      // Solo procesar semanas que tengan al menos un día dentro del mes
+      const weekStartInMonth = weekStart >= monthStart ? weekStart : monthStart;
+      const weekEndInMonth = weekEnd <= monthEnd ? weekEnd : monthEnd;
 
-      const weekHabits = dailyHabits.filter(h => {
-        const habitDate = new Date(h.date + 'T00:00:00');
-        return habitDate >= weekStart && habitDate <= weekEnd;
-      });
+      if (weekStartInMonth <= weekEndInMonth) {
+        const weekActivities = activities.filter(a => {
+          if (a.status !== 'completed') return false;
+          const activityDateString = getLocalDateString(new Date(a.timestamp));
+          const activityDate = new Date(activityDateString + 'T00:00:00');
+          return activityDate >= weekStartInMonth && activityDate <= weekEndInMonth;
+        });
 
-      const weekPoints = weekActivities.reduce((sum, a) => sum + a.points, 0) +
-        weekHabits.reduce((sum, h) => sum + h.totalPoints, 0);
+        const weekHabits = dailyHabits.filter(h => {
+          const habitDate = new Date(h.date + 'T00:00:00');
+          return habitDate >= weekStartInMonth && habitDate <= weekEndInMonth;
+        });
 
-      const activeDays = new Set([
-        ...weekActivities.map(a => getLocalDateString(new Date(a.timestamp))),
-        ...weekHabits.filter(h => h.completedCategories > 0).map(h => h.date)
-      ]).size;
+        const weekPoints = weekActivities.reduce((sum, a) => sum + a.points, 0) +
+          weekHabits.reduce((sum, h) => sum + h.totalPoints, 0);
 
-      const perfectDays = weekHabits.filter(h => {
-        const habitDate = new Date(h.date + 'T00:00:00');
-        const requiredCount = getRequiredCategoryCount(habitDate);
-        return h.completedCategories >= requiredCount;
-      }).length;
+        const activeDays = new Set([
+          ...weekActivities.map(a => getLocalDateString(new Date(a.timestamp))),
+          ...weekHabits.filter(h => h.completedCategories > 0).map(h => h.date)
+        ]).size;
 
-      const premiumHabitsCount = weekHabits.reduce((sum, h) => {
-        return sum + Object.values(h.premiumHabits || {}).filter(Boolean).length;
-      }, 0);
+        const perfectDays = weekHabits.filter(h => {
+          const habitDate = new Date(h.date + 'T00:00:00');
+          const requiredCount = getRequiredCategoryCount(habitDate);
+          return h.completedCategories >= requiredCount;
+        }).length;
 
-      weeksInMonth.push({
-        week: `Sem ${weekNumber}`,
-        weekNum: weekNumber,
-        points: weekPoints,
-        activeDays,
-        perfectDays,
-        premiumHabits: premiumHabitsCount,
-      });
+        const premiumHabitsCount = weekHabits.reduce((sum, h) => {
+          return sum + Object.values(h.premiumHabits || {}).filter(Boolean).length;
+        }, 0);
 
-      currentDate.setDate(currentDate.getDate() + 7);
-      weekNumber++;
+        weeksInMonth.push({
+          week: `Sem ${weekNumber}`,
+          weekNum: weekNumber,
+          points: weekPoints,
+          activeDays,
+          perfectDays,
+          premiumHabits: premiumHabitsCount,
+          startDate: getLocalDateString(weekStartInMonth),
+          endDate: getLocalDateString(weekEndInMonth),
+        });
+
+        weekNumber++;
+      }
+
+      // Avanzar a la siguiente semana
+      weekStart = new Date(weekStart);
+      weekStart.setDate(weekStart.getDate() + 7);
     }
 
     // Encontrar la mejor semana
@@ -563,20 +578,25 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
                       )}
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold">{week.week}</h4>
-                          {isBestWeek && (
-                            <Badge className="bg-yellow-500/20 text-yellow-700 dark:bg-yellow-500/30 dark:text-yellow-300">
-                              <Flame className="w-3 h-3 mr-1" />
-                              Mejor
-                            </Badge>
-                          )}
-                          {trend === 'up' && !isBestWeek && (
-                            <ArrowUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          )}
-                          {trend === 'down' && (
-                            <ArrowDown className="w-4 h-4 text-red-600 dark:text-red-400" />
-                          )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold">{week.week}</h4>
+                            {isBestWeek && (
+                              <Badge className="bg-yellow-500/20 text-yellow-700 dark:bg-yellow-500/30 dark:text-yellow-300">
+                                <Flame className="w-3 h-3 mr-1" />
+                                Mejor
+                              </Badge>
+                            )}
+                            {trend === 'up' && !isBestWeek && (
+                              <ArrowUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            )}
+                            {trend === 'down' && (
+                              <ArrowDown className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(week.startDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - {new Date(week.endDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                          </div>
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold">{week.points}</div>
