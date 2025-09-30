@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { StatsOverview } from '@/components/StatsOverview';
-import { Activity, DailyHabit, CATEGORIES, BONUS_POINTS, getDateString, getLocalDateString, getRequiredCategoryCount } from '@/types/activity';
+import { Activity, DailyHabit, CATEGORIES, BONUS_POINTS, PREMIUM_HABITS, getDateString, getLocalDateString, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { BarChart3, Trophy, Target, Flame, Star, TrendingUp } from 'lucide-react';
+import { BarChart3, Trophy, Target, Flame, Star, TrendingUp, Crown } from 'lucide-react';
 
 const Stats = () => {
   const [activities] = useLocalStorage<Activity[]>('daily-activities', []);
@@ -23,6 +23,20 @@ const Stats = () => {
       ...completedActivities.map(a => getLocalDateString(new Date(a.timestamp))),
       ...dailyHabits.filter(h => h.completedCategories > 0).map(h => h.date)
     ]).size;
+
+    // Calcular estadísticas de premium habits
+    const totalPremiumHabitsCompleted = dailyHabits.reduce((sum, h) => {
+      return sum + Object.values(h.premiumHabits || {}).filter(Boolean).length;
+    }, 0);
+
+    const premiumHabitsPoints = dailyHabits.reduce((sum, h) => {
+      return sum + Object.entries(h.premiumHabits || {}).reduce((habitSum, [habitId, completed]) => {
+        if (completed && PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS]) {
+          return habitSum + PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS].points;
+        }
+        return habitSum;
+      }, 0);
+    }, 0);
 
     // Calcular rachas actuales y más largas
     const sortedHabitDates = dailyHabits
@@ -99,6 +113,8 @@ const Stats = () => {
       longestStreak,
       categoryStats,
       averagePointsPerDay: totalActiveDays > 0 ? totalPoints / totalActiveDays : 0,
+      totalPremiumHabitsCompleted,
+      premiumHabitsPoints,
     };
   }, [activities, dailyHabits]);
 
@@ -112,8 +128,9 @@ const Stats = () => {
         icon: Flame,
         title: `Racha de ${overallStats.currentStreak} días`,
         description: 'Mantén la consistencia',
-        color: 'text-orange-500',
-        bgColor: 'bg-orange-50',
+        color: 'text-orange-500 dark:text-orange-400',
+        bgColor: 'bg-orange-50 dark:bg-orange-950/30',
+        borderColor: 'border-orange-200 dark:border-orange-900/50',
       });
     }
 
@@ -122,8 +139,9 @@ const Stats = () => {
         icon: Trophy,
         title: `Récord: ${overallStats.longestStreak} días seguidos`,
         description: '¡Increíble consistencia!',
-        color: 'text-yellow-600',
-        bgColor: 'bg-yellow-50',
+        color: 'text-yellow-600 dark:text-yellow-400',
+        bgColor: 'bg-yellow-50 dark:bg-yellow-950/30',
+        borderColor: 'border-yellow-200 dark:border-yellow-900/50',
       });
     }
 
@@ -133,8 +151,9 @@ const Stats = () => {
         icon: Star,
         title: `${overallStats.totalPoints} puntos totales`,
         description: 'Milestone de productividad',
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-50',
+        color: 'text-purple-600 dark:text-purple-400',
+        bgColor: 'bg-purple-50 dark:bg-purple-950/30',
+        borderColor: 'border-purple-200 dark:border-purple-900/50',
       });
     }
 
@@ -144,8 +163,21 @@ const Stats = () => {
         icon: Target,
         title: `${overallStats.totalBonusDays} días perfectos`,
         description: 'Maestro de hábitos',
-        color: 'text-green-600',
-        bgColor: 'bg-green-50',
+        color: 'text-green-600 dark:text-green-400',
+        bgColor: 'bg-green-50 dark:bg-green-950/30',
+        borderColor: 'border-green-200 dark:border-green-900/50',
+      });
+    }
+
+    // Logros de premium habits
+    if (overallStats.totalPremiumHabitsCompleted >= 3) {
+      achievements.push({
+        icon: Crown,
+        title: `${overallStats.totalPremiumHabitsCompleted} hábitos premium`,
+        description: `${overallStats.premiumHabitsPoints} puntos premium ganados`,
+        color: 'text-yellow-600 dark:text-yellow-400',
+        bgColor: 'bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30',
+        borderColor: 'border-yellow-300 dark:border-yellow-800/50',
       });
     }
 
@@ -224,6 +256,38 @@ const Stats = () => {
           </Card>
         </div>
 
+        {/* Premium Habits Summary */}
+        {overallStats.totalPremiumHabitsCompleted > 0 && (
+          <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-900/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Crown className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                Hábitos Premium
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-yellow-700 dark:text-yellow-300">
+                    {overallStats.totalPremiumHabitsCompleted}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Completados en total
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Badge className="bg-yellow-500/20 text-yellow-700 dark:bg-yellow-500/30 dark:text-yellow-300 text-lg px-3 py-1">
+                    +{overallStats.premiumHabitsPoints}pts
+                  </Badge>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Puntos premium
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Logros */}
         {achievements.length > 0 && (
           <Card>
@@ -238,11 +302,11 @@ const Stats = () => {
                 {achievements.map((achievement, index) => (
                   <div
                     key={index}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${achievement.bgColor}`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border ${achievement.bgColor} ${achievement.borderColor}`}
                   >
                     <achievement.icon className={`w-5 h-5 ${achievement.color}`} />
                     <div className="flex-1">
-                      <p className="font-medium text-sm">{achievement.title}</p>
+                      <p className="font-medium text-sm text-foreground">{achievement.title}</p>
                       <p className="text-xs text-muted-foreground">{achievement.description}</p>
                     </div>
                   </div>
@@ -328,6 +392,26 @@ const Stats = () => {
                     <span>Racha de 7 días:</span>
                     <Badge variant="outline">+{BONUS_POINTS.STREAK_7_DAYS}pts</Badge>
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2 flex items-center gap-1">
+                  <Crown className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                  Hábitos Premium:
+                </p>
+                <div className="space-y-1 text-xs">
+                  {Object.entries(PREMIUM_HABITS).map(([key, habit]) => (
+                    <div key={key} className="flex justify-between">
+                      <span className="flex items-center gap-1">
+                        <span>{habit.icon}</span>
+                        <span>{habit.label}:</span>
+                      </span>
+                      <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-300">
+                        +{habit.points}pts
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

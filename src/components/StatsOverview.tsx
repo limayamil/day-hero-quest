@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
-import { Activity, DailyHabit, WeeklyStats, MonthlyStats, CATEGORIES, CategoryType, TOTAL_CATEGORIES, getLocalDateString, getWeekStart, getLocalMonthString, getRequiredCategoryCount } from '@/types/activity';
+import { Activity, DailyHabit, WeeklyStats, MonthlyStats, CATEGORIES, CategoryType, TOTAL_CATEGORIES, PREMIUM_HABITS, getLocalDateString, getWeekStart, getLocalMonthString, getRequiredCategoryCount } from '@/types/activity';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { CalendarDays, TrendingUp, Star, Target, Award, Flame } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Area, AreaChart } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { CalendarDays, TrendingUp, Star, Target, Award, Flame, Crown, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatsOverviewProps {
@@ -156,8 +157,43 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
       };
     });
 
-    // Datos para el gráfico semanal del mes
-    const weeksInMonth: { week: string; points: number; }[] = [];
+    // Datos para el gráfico diario del mes (línea)
+    const daysInMonth: { day: number; date: string; points: number; activities: number; habits: number; premium: number; hasBonus: boolean }[] = [];
+    const daysCount = monthEnd.getDate();
+
+    for (let day = 1; day <= daysCount; day++) {
+      const dayDate = new Date(today.getFullYear(), today.getMonth(), day);
+      const dayString = getLocalDateString(dayDate);
+
+      const dayActivities = monthActivities.filter(a =>
+        getLocalDateString(new Date(a.timestamp)) === dayString
+      );
+      const dayHabit = monthHabits.find(h => h.date === dayString);
+
+      const activityPoints = dayActivities.reduce((sum, a) => sum + a.points, 0);
+      const habitPoints = dayHabit?.totalPoints || 0;
+
+      // Calcular puntos premium del día
+      const premiumPoints = dayHabit ? Object.entries(dayHabit.premiumHabits || {}).reduce((sum, [habitId, completed]) => {
+        if (completed && PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS]) {
+          return sum + PREMIUM_HABITS[habitId as keyof typeof PREMIUM_HABITS].points;
+        }
+        return sum;
+      }, 0) : 0;
+
+      daysInMonth.push({
+        day,
+        date: dayString,
+        points: activityPoints + habitPoints,
+        activities: activityPoints,
+        habits: habitPoints - premiumPoints,
+        premium: premiumPoints,
+        hasBonus: dayHabit?.bonusEarned || false,
+      });
+    }
+
+    // Datos para el gráfico semanal del mes (comparativa)
+    const weeksInMonth: { week: string; weekNum: number; points: number; activeDays: number; perfectDays: number; premiumHabits: number; }[] = [];
     const currentDate = new Date(monthStart);
     let weekNumber = 1;
 
@@ -166,27 +202,51 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
 
-      const weekPoints = activities
-        .filter(a => {
-          const activityDate = new Date(a.timestamp);
-          return activityDate >= weekStart && activityDate <= weekEnd && a.status === 'completed';
-        })
-        .reduce((sum, a) => sum + a.points, 0) +
-        dailyHabits
-          .filter(h => {
-            const habitDate = new Date(h.date);
-            return habitDate >= weekStart && habitDate <= weekEnd;
-          })
-          .reduce((sum, h) => sum + h.totalPoints, 0);
+      const weekActivities = activities.filter(a => {
+        const activityDate = new Date(a.timestamp);
+        return activityDate >= weekStart && activityDate <= weekEnd && a.status === 'completed';
+      });
+
+      const weekHabits = dailyHabits.filter(h => {
+        const habitDate = new Date(h.date + 'T00:00:00');
+        return habitDate >= weekStart && habitDate <= weekEnd;
+      });
+
+      const weekPoints = weekActivities.reduce((sum, a) => sum + a.points, 0) +
+        weekHabits.reduce((sum, h) => sum + h.totalPoints, 0);
+
+      const activeDays = new Set([
+        ...weekActivities.map(a => getLocalDateString(new Date(a.timestamp))),
+        ...weekHabits.filter(h => h.completedCategories > 0).map(h => h.date)
+      ]).size;
+
+      const perfectDays = weekHabits.filter(h => {
+        const habitDate = new Date(h.date + 'T00:00:00');
+        const requiredCount = getRequiredCategoryCount(habitDate);
+        return h.completedCategories >= requiredCount;
+      }).length;
+
+      const premiumHabitsCount = weekHabits.reduce((sum, h) => {
+        return sum + Object.values(h.premiumHabits || {}).filter(Boolean).length;
+      }, 0);
 
       weeksInMonth.push({
         week: `Sem ${weekNumber}`,
+        weekNum: weekNumber,
         points: weekPoints,
+        activeDays,
+        perfectDays,
+        premiumHabits: premiumHabitsCount,
       });
 
       currentDate.setDate(currentDate.getDate() + 7);
       weekNumber++;
     }
+
+    // Encontrar la mejor semana
+    const bestWeek = weeksInMonth.reduce((best, current) =>
+      current.points > best.points ? current : best
+    , weeksInMonth[0] || { week: '', weekNum: 0, points: 0, activeDays: 0, perfectDays: 0, premiumHabits: 0 });
 
     return {
       totalPoints,
@@ -196,6 +256,8 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
       averagePointsPerDay: totalPoints / monthEnd.getDate(),
       categoryDistribution,
       weeksInMonth,
+      daysInMonth,
+      bestWeek,
       completionRate: (activeDays / monthEnd.getDate()) * 100,
     };
   }, [activities, dailyHabits, currentMonth, today]);
@@ -314,18 +376,40 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
           </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Progreso Semanal</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Progreso Semanal</CardTitle>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyStats.weekData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Bar dataKey="totalPoints" fill="#8884d8" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <CardContent className="px-2 pb-2">
+              <ChartContainer
+                config={{
+                  totalPoints: { label: "Puntos", color: "hsl(var(--chart-1))" },
+                }}
+                className="h-[180px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyStats.weekData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" opacity={0.3} />
+                    <XAxis
+                      dataKey="day"
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      tickMargin={8}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      tickMargin={8}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      width={35}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar
+                      dataKey="totalPoints"
+                      fill="hsl(var(--chart-1))"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             </CardContent>
           </Card>
 
@@ -380,71 +464,201 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
             </Card>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Progreso Semanal</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={monthlyStats.weeksInMonth}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" />
-                    <YAxis />
-                    <Bar dataKey="points" fill="#82ca9d" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribución por Categoría</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={monthlyStats.categoryDistribution}
+          {/* Gráfico de línea de evolución diaria */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="w-5 h-5" />
+                Evolución Diaria del Mes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-2">
+              <ChartContainer
+                config={{
+                  points: { label: "Puntos Totales", color: "hsl(var(--chart-1))" },
+                  activities: { label: "Actividades", color: "hsl(var(--chart-2))" },
+                  habits: { label: "Hábitos", color: "hsl(var(--chart-3))" },
+                  premium: { label: "Premium", color: "hsl(var(--chart-4))" },
+                }}
+                className="h-[220px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyStats.daysInMonth} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorPoints" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorPremium" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-4))" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="hsl(var(--chart-4))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" opacity={0.3} />
+                    <XAxis
+                      dataKey="day"
+                      className="text-xs"
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      tickMargin={8}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis
+                      className="text-xs"
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      tickMargin={8}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      width={35}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Area
+                      type="monotone"
                       dataKey="points"
-                      nameKey="category"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      label={({ category, points }) => `${category}: ${points}`}
-                    >
-                      {monthlyStats.categoryDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
+                      stroke="hsl(var(--chart-1))"
+                      fill="url(#colorPoints)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="premium"
+                      stroke="hsl(var(--chart-4))"
+                      fill="url(#colorPremium)"
+                      strokeWidth={2}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
+              </ChartContainer>
+            </CardContent>
+          </Card>
 
+          {/* Comparativa de semanas */}
           <Card>
             <CardHeader>
-              <CardTitle>Resumen Mensual</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="w-5 h-5" />
+                Comparativa Semanal
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{monthlyStats.completeDays}</div>
-                  <div className="text-sm text-muted-foreground">Días Perfectos</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{monthlyStats.totalActivities}</div>
-                  <div className="text-sm text-muted-foreground">Actividades</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-purple-600">{monthlyStats.activeDays}</div>
-                  <div className="text-sm text-muted-foreground">Días Activos</div>
-                </div>
+              <div className="space-y-3">
+                {monthlyStats.weeksInMonth.map((week, index) => {
+                  const isBestWeek = week.weekNum === monthlyStats.bestWeek.weekNum;
+                  const prevWeek = index > 0 ? monthlyStats.weeksInMonth[index - 1] : null;
+                  const trend = prevWeek ? (week.points > prevWeek.points ? 'up' : week.points < prevWeek.points ? 'down' : 'stable') : 'stable';
+
+                  return (
+                    <div
+                      key={week.week}
+                      className={cn(
+                        "p-4 rounded-lg border-2 transition-all",
+                        isBestWeek
+                          ? "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 border-yellow-300 dark:border-yellow-800/50"
+                          : "bg-muted/30 border-border"
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{week.week}</h4>
+                          {isBestWeek && (
+                            <Badge className="bg-yellow-500/20 text-yellow-700 dark:bg-yellow-500/30 dark:text-yellow-300">
+                              <Flame className="w-3 h-3 mr-1" />
+                              Mejor
+                            </Badge>
+                          )}
+                          {trend === 'up' && !isBestWeek && (
+                            <ArrowUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                          )}
+                          {trend === 'down' && (
+                            <ArrowDown className="w-4 h-4 text-red-600 dark:text-red-400" />
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold">{week.points}</div>
+                          <div className="text-xs text-muted-foreground">puntos</div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3 text-center text-sm">
+                        <div>
+                          <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">{week.activeDays}</div>
+                          <div className="text-xs text-muted-foreground">Días activos</div>
+                        </div>
+                        <div>
+                          <div className="text-lg font-semibold text-green-600 dark:text-green-400">{week.perfectDays}</div>
+                          <div className="text-xs text-muted-foreground">Días perfectos</div>
+                        </div>
+                        <div>
+                          <div className="text-lg font-semibold text-yellow-600 dark:text-yellow-400 flex items-center justify-center gap-1">
+                            {week.premiumHabits > 0 && <Crown className="w-4 h-4" />}
+                            {week.premiumHabits}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Premium</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Distribución por Categoría</CardTitle>
+              </CardHeader>
+              <CardContent className="px-2 pb-2">
+                <ChartContainer
+                  config={{
+                    points: { label: "Puntos", color: "hsl(var(--chart-1))" },
+                  }}
+                  className="h-[200px] w-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Pie
+                        data={monthlyStats.categoryDistribution}
+                        dataKey="points"
+                        nameKey="category"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        fill="hsl(var(--chart-1))"
+                        label={({ category, points }) => `${category}: ${points}`}
+                        labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
+                      >
+                        {monthlyStats.categoryDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Resumen Mensual</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{monthlyStats.completeDays}</div>
+                    <div className="text-sm text-muted-foreground">Días Perfectos</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{monthlyStats.totalActivities}</div>
+                    <div className="text-sm text-muted-foreground">Actividades</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{monthlyStats.activeDays}</div>
+                    <div className="text-sm text-muted-foreground">Días Activos</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
