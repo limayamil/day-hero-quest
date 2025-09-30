@@ -125,11 +125,16 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const monthActivities = activities.filter(activity => {
-      const activityDate = new Date(activity.status === 'completed' ? activity.timestamp : activity.plannedDate || activity.timestamp);
-      return activityDate >= monthStart && activityDate <= monthEnd && activity.status === 'completed';
+      if (activity.status !== 'completed') return false;
+      const activityDateString = getLocalDateString(new Date(activity.timestamp));
+      const activityDate = new Date(activityDateString + 'T00:00:00');
+      return activityDate >= monthStart && activityDate <= monthEnd;
     });
 
-    const monthHabits = dailyHabits.filter(h => h.date.startsWith(currentMonth));
+    const monthHabits = dailyHabits.filter(h => {
+      const habitDate = new Date(h.date + 'T00:00:00');
+      return habitDate >= monthStart && habitDate <= monthEnd;
+    });
 
     const totalActivityPoints = monthActivities.reduce((sum, activity) => sum + activity.points, 0);
     const totalHabitPoints = monthHabits.reduce((sum, habit) => sum + habit.totalPoints, 0);
@@ -203,8 +208,10 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
       weekEnd.setDate(weekEnd.getDate() + 6);
 
       const weekActivities = activities.filter(a => {
-        const activityDate = new Date(a.timestamp);
-        return activityDate >= weekStart && activityDate <= weekEnd && a.status === 'completed';
+        if (a.status !== 'completed') return false;
+        const activityDateString = getLocalDateString(new Date(a.timestamp));
+        const activityDate = new Date(activityDateString + 'T00:00:00');
+        return activityDate >= weekStart && activityDate <= weekEnd;
       });
 
       const weekHabits = dailyHabits.filter(h => {
@@ -404,7 +411,7 @@ export const StatsOverview = ({ selectedPeriod = 'day' }: StatsOverviewProps) =>
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar
                       dataKey="totalPoints"
-                      fill="hsl(var(--chart-1))"
+                      fill="hsl(var(--primary))"
                       radius={[4, 4, 0, 0]}
                     />
                   </BarChart>
